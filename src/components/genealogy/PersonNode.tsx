@@ -432,11 +432,6 @@ export const PersonNode = memo(function PersonNode({
             }}
           >
             {displayName}
-            {person.suffix_title && (
-              <span style={{ fontWeight: 500, color: "var(--muted)", fontSize: "11px" }}>
-                {" "}{person.suffix_title}
-              </span>
-            )}
           </div>
         </div>
       </div>

@@ -183,8 +183,51 @@ export default function FamilyTreePage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["canvas-data"],
     queryFn: getCanvasData,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 1000, // Cepat refresh (5 detik) agar saat kembali dari form edit langsung mutakhir
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
+
+  // Supabase Realtime: otomatis invalidasi dan perbarui kanvas silsilah secara instan saat data anggota/relasi/foto berubah
+  useEffect(() => {
+    const channel = supabase
+      .channel("realtime-tree-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "people" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
+          queryClient.invalidateQueries({ queryKey: ["person-profile"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "parent_child_relationships" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "unions" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "person_media" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
+          queryClient.invalidateQueries({ queryKey: ["person-profile"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Bangun profil instan secara synchronous dari data kanvas di memori (0ms delay)
   const instantProfile = useMemo(() => {

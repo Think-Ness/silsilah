@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Archive } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ interface PersonEditFormProps {
 
 export default function PersonEditForm({ person }: PersonEditFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
@@ -107,6 +109,14 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
         await updatePerson(person.id, payload);
       }
 
+      // Invalidate query cache silsilah, orang, dan profil agar perubahan langsung tampil seketika (0ms delay)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["canvas-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["people"] }),
+        queryClient.invalidateQueries({ queryKey: ["person-profile", person.id] }),
+      ]);
+      router.refresh();
+
       toast.success("Profil dan foto berhasil diperbarui");
       router.push(`/people/${person.id}`);
     } catch (err: any) {
@@ -122,6 +132,12 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
     setArchiving(true);
     try {
       await archivePerson(person.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["canvas-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["people"] }),
+        queryClient.invalidateQueries({ queryKey: ["person-profile", person.id] }),
+      ]);
+      router.refresh();
       toast.success("Anggota diarsipkan");
       router.push("/people");
     } catch (err) {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 
 export default function NewPersonPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [photoState, setPhotoState] = useState<PhotoUploadState>({
     file: null,
@@ -95,6 +97,12 @@ export default function NewPersonPage() {
       if (portraitMediaId) {
         await linkMediaToPerson(person.id, portraitMediaId, "portrait", true);
       }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["canvas-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["people"] }),
+      ]);
+      router.refresh();
 
       toast.success(`${form.display_name || form.full_name} berhasil ditambahkan`);
       router.push(`/people/${person.id}`);
