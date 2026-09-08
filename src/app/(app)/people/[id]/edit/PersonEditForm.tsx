@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { updatePerson, archivePerson } from "@/lib/genealogy/people";
 import { uploadMedia, linkMediaToPerson, removePersonPortrait, getMediaUrl } from "@/lib/genealogy/media";
 import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/PersonPhotoUpload";
+import { GenderSelector, LifeStatusSelector, DatePrecisionSelector } from "@/components/people/FormSelectors";
 import type { PersonWithPortrait, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
 import { toast } from "sonner";
 
@@ -204,14 +205,11 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <Label htmlFor="gender">Jenis Kelamin</Label>
-              <Select value={form.gender} onValueChange={(v) => update("gender", v as Gender)}>
-                <SelectTrigger id="gender" style={{ marginTop: "6px" }}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Laki-laki</SelectItem>
-                  <SelectItem value="female">Perempuan</SelectItem>
-                  <SelectItem value="unknown">Tidak diketahui</SelectItem>
-                </SelectContent>
-              </Select>
+              <GenderSelector
+                value={form.gender}
+                onChange={(v) => update("gender", v)}
+                disabled={loading}
+              />
             </div>
           </div>
         </div>
@@ -226,16 +224,12 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
               <Input id="birth_date" type="date" value={form.birth_date} onChange={(e) => update("birth_date", e.target.value)} style={{ marginTop: "6px" }} />
             </div>
             <div>
-              <Label htmlFor="birth_date_precision">Ketepatan</Label>
-              <Select value={form.birth_date_precision} onValueChange={(v) => update("birth_date_precision", v as DatePrecision)}>
-                <SelectTrigger id="birth_date_precision" style={{ marginTop: "6px" }}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="exact">Tepat</SelectItem>
-                  <SelectItem value="month">Perkiraan bulan</SelectItem>
-                  <SelectItem value="year">Perkiraan tahun</SelectItem>
-                  <SelectItem value="unknown">Tidak diketahui</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Ketepatan Tanggal</Label>
+              <DatePrecisionSelector
+                value={form.birth_date_precision}
+                onChange={(v) => update("birth_date_precision", v)}
+                disabled={loading}
+              />
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <Label htmlFor="birth_place">Tempat Lahir</Label>
@@ -246,19 +240,16 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
 
         {/* Status */}
         <div className="form-section">
-          <h2 className="form-section-title">Status</h2>
+          <h2 className="form-section-title">Status Kehidupan</h2>
           <div className="form-section-divider" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <div style={{ gridColumn: "1 / -1" }}>
-              <Label htmlFor="life_status">Status Kehidupan</Label>
-              <Select value={form.life_status} onValueChange={(v) => update("life_status", v as LifeStatus)}>
-                <SelectTrigger id="life_status" style={{ marginTop: "6px" }}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="living">Masih Hidup</SelectItem>
-                  <SelectItem value="deceased">Almarhum/Almarhumah</SelectItem>
-                  <SelectItem value="unknown">Tidak Diketahui</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Status Keberadaan</Label>
+              <LifeStatusSelector
+                value={form.life_status}
+                onChange={(v) => update("life_status", v)}
+                disabled={loading}
+              />
             </div>
             {form.life_status === "deceased" && (
               <>

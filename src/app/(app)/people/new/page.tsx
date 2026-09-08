@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { createPerson } from "@/lib/genealogy/people";
 import { uploadMedia, linkMediaToPerson } from "@/lib/genealogy/media";
 import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/PersonPhotoUpload";
+import { GenderSelector, LifeStatusSelector, DatePrecisionSelector } from "@/components/people/FormSelectors";
 import type { CreatePersonInput, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
 import { toast } from "sonner";
 
@@ -205,19 +206,11 @@ export default function NewPersonPage() {
 
             <div style={{ gridColumn: "1 / -1" }}>
               <Label htmlFor="gender">Jenis Kelamin</Label>
-              <Select
+              <GenderSelector
                 value={form.gender}
-                onValueChange={(v) => updateField("gender", v as Gender)}
-              >
-                <SelectTrigger id="gender" style={{ marginTop: "6px" }}>
-                  <SelectValue placeholder="Pilih jenis kelamin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Laki-laki</SelectItem>
-                  <SelectItem value="female">Perempuan</SelectItem>
-                  <SelectItem value="unknown">Tidak diketahui</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => updateField("gender", v)}
+                disabled={loading}
+              />
             </div>
           </div>
         </div>
@@ -240,21 +233,12 @@ export default function NewPersonPage() {
             </div>
 
             <div>
-              <Label htmlFor="birth_date_precision">Ketepatan Tanggal</Label>
-              <Select
+              <Label>Ketepatan Tanggal</Label>
+              <DatePrecisionSelector
                 value={form.birth_date_precision}
-                onValueChange={(v) => updateField("birth_date_precision", v as DatePrecision)}
-              >
-                <SelectTrigger id="birth_date_precision" style={{ marginTop: "6px" }}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="exact">Tepat</SelectItem>
-                  <SelectItem value="month">Perkiraan bulan</SelectItem>
-                  <SelectItem value="year">Perkiraan tahun</SelectItem>
-                  <SelectItem value="unknown">Tidak diketahui</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => updateField("birth_date_precision", v)}
+                disabled={loading}
+              />
             </div>
 
             <div style={{ gridColumn: "1 / -1" }}>
@@ -277,20 +261,12 @@ export default function NewPersonPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <div style={{ gridColumn: "1 / -1" }}>
-              <Label htmlFor="life_status">Status</Label>
-              <Select
+              <Label>Status Keberadaan</Label>
+              <LifeStatusSelector
                 value={form.life_status}
-                onValueChange={(v) => updateField("life_status", v as LifeStatus)}
-              >
-                <SelectTrigger id="life_status" style={{ marginTop: "6px" }}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="living">Masih Hidup</SelectItem>
-                  <SelectItem value="deceased">Almarhum/Almarhumah</SelectItem>
-                  <SelectItem value="unknown">Tidak Diketahui</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => updateField("life_status", v)}
+                disabled={loading}
+              />
             </div>
 
             {form.life_status === "deceased" && (
