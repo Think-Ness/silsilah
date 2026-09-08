@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Hubungan Keluarga | Silsilah",
 };
@@ -15,12 +17,14 @@ function getDisplayName(p: { prefix_title?: string | null; display_name?: string
 
 export default async function RelationshipsPage() {
   const supabase = await createClient();
-  const [unions, parentChildRels, people] = await Promise.all([
+  const [unions, parentChildRels, people, unionMembersRes] = await Promise.all([
     getAllUnions(supabase),
     getAllParentChildRelationships(supabase),
     getAllPeople(undefined, supabase),
+    supabase.from("union_members").select("*"),
   ]);
 
+  const unionMembers = unionMembersRes.data || [];
   const peopleMap = new Map(people.map((p) => [p.id, p]));
 
   return (
@@ -32,7 +36,7 @@ export default async function RelationshipsPage() {
         <div>
           <h1 className="page-title">Hubungan Keluarga</h1>
           <p className="page-subtitle">
-            {unions.length} pernikahan/union · {parentChildRels.length} hubungan ortu-anak
+            {unions.length} pernikahan/pasangan · {parentChildRels.length} hubungan ortu-anak
           </p>
         </div>
         <Link
@@ -60,7 +64,7 @@ export default async function RelationshipsPage() {
       {/* Unions */}
       <section style={{ marginBottom: "32px" }}>
         <h2 style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>
-          Pernikahan & Union ({unions.length})
+          Pernikahan & Pasangan ({unions.length})
         </h2>
         <div
           style={{
@@ -72,33 +76,62 @@ export default async function RelationshipsPage() {
         >
           {unions.length === 0 ? (
             <div className="empty-state" style={{ padding: "32px" }}>
-              <div className="empty-state-title">Belum ada union</div>
+              <div className="empty-state-title">Belum ada data pernikahan/pasangan</div>
             </div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Pasangan</th>
-                  <th>Jenis</th>
+                  <th>Jenis Hubungan</th>
                   <th>Status</th>
-                  <th>Mulai</th>
+                  <th>Tanggal Pernikahan</th>
                 </tr>
               </thead>
               <tbody>
                 {unions.map((union) => {
-                  // Get members dari parent_child_relationships — ini perlu union_members
+                  const members = unionMembers.filter((um: any) => um.union_id === union.id);
+                  const p1 = members[0] ? peopleMap.get(members[0].person_id) : null;
+                  const p2 = members[1] ? peopleMap.get(members[1].person_id) : null;
+
                   return (
                     <tr key={union.id}>
                       <td>
-                        <span style={{ fontSize: "14px", color: "var(--foreground)" }}>
-                          {union.id.slice(0, 8)}...
+                        <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--foreground)" }}>
+                          {p1 ? (
+                            <Link href={`/people/${p1.id}`} style={{ color: "var(--accent-color)", textDecoration: "none" }}>
+                              {getDisplayName(p1)}
+                            </Link>
+                          ) : (
+                            "Anggota"
+                          )}
+                          {" & "}
+                          {p2 ? (
+                            <Link href={`/people/${p2.id}`} style={{ color: "var(--accent-color)", textDecoration: "none" }}>
+                              {getDisplayName(p2)}
+                            </Link>
+                          ) : (
+                            "Anggota"
+                          )}
                         </span>
                       </td>
                       <td style={{ fontSize: "13px", color: "var(--muted)" }}>
                         {union.relationship_type === "marriage" ? "Pernikahan" : union.relationship_type}
                       </td>
-                      <td style={{ fontSize: "13px", color: "var(--muted)" }}>
-                        {union.status === "active" ? "Aktif" : union.status === "ended" ? "Berakhir" : union.status === "widowed" ? "Duda/Janda" : "—"}
+                      <td style={{ fontSize: "13px" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            fontWeight: 500,
+                            background: union.status === "active" ? "#DCFCE7" : "var(--subtle)",
+                            color: union.status === "active" ? "#166534" : "var(--muted)",
+                          }}
+                        >
+                          {union.status === "active" ? "Aktif" : union.status === "ended" ? "Berakhir" : union.status === "widowed" ? "Duda/Janda" : union.status === "divorced" ? "Cerai" : "—"}
+                        </span>
                       </td>
                       <td style={{ fontSize: "13px", color: "var(--muted)" }}>
                         {union.start_date || "—"}

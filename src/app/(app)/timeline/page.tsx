@@ -3,6 +3,8 @@ import { TimelinePageClient } from "./TimelinePageClient";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Timeline | Silsilah Keluarga",
   description: "Garis waktu kronologis peristiwa penting keluarga",

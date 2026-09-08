@@ -206,7 +206,8 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
                   </Link>
                   <span style={{ fontSize: "12px", color: "var(--muted)", marginLeft: "6px" }}>
                     ({union.relationship_type === "marriage" ? "Menikah" : union.relationship_type}
-                    {union.status === "ended" ? ", telah berakhir" : union.status === "widowed" ? ", duda/janda" : ""})
+                    {union.start_date ? ` sejak ${union.start_date}` : ""}
+                    {union.status === "ended" ? ", telah berakhir" : union.status === "widowed" ? ", duda/janda" : union.status === "divorced" ? ", cerai" : ""})
                   </span>
                 </div>
               ))}

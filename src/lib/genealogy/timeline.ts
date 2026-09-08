@@ -22,10 +22,14 @@ export interface TimelineEvent {
   personId: string;
   personName: string;
   personGender: string;
+  personPortraitPath?: string | null;
   description: string;
   relatedPersonId?: string;       // e.g. spouse in marriage event
   relatedPersonName?: string;
+  relatedPersonGender?: string;
+  relatedPersonPortraitPath?: string | null;
   place?: string;
+  ageAtEvent?: number | null;     // e.g. age at marriage, age at death
 }
 
 const MONTH_ID = [
@@ -33,22 +37,38 @@ const MONTH_ID = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-function formatDate(dateStr: string, precision: string): string {
+function formatDate(dateStr: string, precision?: string | null): string {
   if (!dateStr) return "Tanggal tidak diketahui";
-  const d = new Date(dateStr);
-  if (precision === "exact") {
-    return `${d.getDate()} ${MONTH_ID[d.getMonth()]} ${d.getFullYear()}`;
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return dateStr;
+
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+
+  if (precision === "year") {
+    return `${y}`;
   } else if (precision === "month") {
-    return `${MONTH_ID[d.getMonth()]} ${d.getFullYear()}`;
+    return `${MONTH_ID[m] || parts[1]} ${y}`;
   }
-  return `${d.getFullYear()}`;
+  return `${d} ${MONTH_ID[m] || parts[1]} ${y}`;
 }
 
 function getYear(dateStr: string): number {
-  return new Date(dateStr).getFullYear();
+  if (!dateStr) return 0;
+  const y = parseInt(dateStr.split("-")[0], 10);
+  return isNaN(y) ? new Date(dateStr).getFullYear() : y;
 }
 
-function personDisplayName(p: Person): string {
+function calculateAge(birthDateStr?: string | null, targetDateStr?: string | null): number | null {
+  if (!birthDateStr || !targetDateStr) return null;
+  const birthYear = getYear(birthDateStr);
+  const targetYear = getYear(targetDateStr);
+  if (!birthYear || !targetYear || targetYear < birthYear) return null;
+  return targetYear - birthYear;
+}
+
+function personDisplayName(p: { prefix_title?: string | null; display_name?: string | null; full_name: string; suffix_title?: string | null }): string {
   const parts = [p.prefix_title, p.display_name || p.full_name, p.suffix_title]
     .filter(Boolean)
     .join(" ");
@@ -61,21 +81,24 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
 
   const events: TimelineEvent[] = [];
 
-  // Fetch people
+  // Fetch all people with their portrait media
   let peopleQuery = supabase
     .from("people")
-    .select("*")
-    .is("archived_at", null)
-    .not("birth_date", "is", null);
+    .select("*, portrait:media!portrait_media_id(storage_path)")
+    .is("archived_at", null);
 
   if (personId) {
     peopleQuery = peopleQuery.eq("id", personId);
   }
 
-  const { data: people } = await peopleQuery.returns<Person[]>();
+  const { data: people } = await peopleQuery;
 
-  // Birth events
+  // Process birth and death events
   for (const person of people ?? []) {
+    const portraitPath = (person as any).portrait?.storage_path || null;
+    const name = personDisplayName(person);
+
+    // 1. Birth Event
     if (person.birth_date) {
       events.push({
         id: `birth-${person.id}`,
@@ -83,40 +106,46 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
         date: person.birth_date,
         dateDisplay: formatDate(person.birth_date, person.birth_date_precision),
         year: getYear(person.birth_date),
-        precision: person.birth_date_precision as "exact" | "year" | "month" | "unknown",
+        precision: (person.birth_date_precision as any) || "exact",
         personId: person.id,
-        personName: personDisplayName(person),
+        personName: name,
         personGender: person.gender,
-        description: `${personDisplayName(person)} lahir`,
+        personPortraitPath: portraitPath,
+        description: `Kelahiran ${name}`,
         place: person.birth_place ?? undefined,
+        ageAtEvent: null,
       });
     }
 
-    if (person.death_date && person.life_status === "deceased") {
+    // 2. Death Event (Wafat) - include if death_date is provided, or if life_status is deceased with death_date
+    if (person.death_date) {
+      const ageAtDeath = calculateAge(person.birth_date, person.death_date);
       events.push({
         id: `death-${person.id}`,
         type: "death",
         date: person.death_date,
         dateDisplay: formatDate(person.death_date, person.death_date_precision),
         year: getYear(person.death_date),
-        precision: person.death_date_precision as "exact" | "year" | "month" | "unknown",
+        precision: (person.death_date_precision as any) || "exact",
         personId: person.id,
-        personName: personDisplayName(person),
+        personName: name,
         personGender: person.gender,
-        description: `${personDisplayName(person)} wafat`,
+        personPortraitPath: portraitPath,
+        description: `${name} wafat`,
         place: person.death_place ?? undefined,
+        ageAtEvent: ageAtDeath,
       });
     }
   }
 
-  // Fetch unions (marriages)
+  // 3. Fetch unions (marriages & divorces)
   const { data: unions } = await supabase
     .from("unions")
     .select("*")
-    .not("start_date", "is", null)
+    .or("start_date.not.is.null,end_date.not.is.null")
     .returns<Union[]>();
 
-  // Fetch union members to get names
+  // Fetch union members
   const { data: unionMembers } = await supabase
     .from("union_members")
     .select("*")
@@ -124,11 +153,10 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
 
   const { data: allPeople } = await supabase
     .from("people")
-    .select("id, full_name, display_name, prefix_title, suffix_title, gender")
-    .is("archived_at", null)
-    .returns<Person[]>();
+    .select("id, full_name, display_name, prefix_title, suffix_title, gender, birth_date, portrait:media!portrait_media_id(storage_path)")
+    .is("archived_at", null);
 
-  const peopleMap = new Map<string, Person>(allPeople?.map((p) => [p.id, p]) ?? []);
+  const peopleMap = new Map<string, any>(allPeople?.map((p) => [p.id, p]) ?? []);
 
   for (const union of unions ?? []) {
     const members = unionMembers?.filter((um) => um.union_id === union.id) ?? [];
@@ -139,52 +167,64 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
     const p2 = peopleMap.get(m2.person_id);
     if (!p1 || !p2) continue;
 
-    // Filter: only include if personId is one of the members
+    // Filter: only include if personId matches one of the partners
     if (personId && p1.id !== personId && p2.id !== personId) continue;
 
+    const p1Name = personDisplayName(p1);
+    const p2Name = personDisplayName(p2);
+    const p1Portrait = p1.portrait?.storage_path || null;
+    const p2Portrait = p2.portrait?.storage_path || null;
+
+    // Marriage event
     if (union.start_date) {
-      const eventType: TimelineEventType =
-        union.relationship_type === "marriage" ? "marriage" : "marriage";
+      const ageP1 = calculateAge(p1.birth_date, union.start_date);
 
       events.push({
         id: `union-${union.id}`,
-        type: eventType,
+        type: "marriage",
         date: union.start_date,
         dateDisplay: formatDate(union.start_date, union.start_date_precision),
         year: getYear(union.start_date),
-        precision: union.start_date_precision as "exact" | "year" | "month" | "unknown",
+        precision: (union.start_date_precision as any) || "exact",
         personId: p1.id,
-        personName: personDisplayName(p1),
+        personName: p1Name,
         personGender: p1.gender,
+        personPortraitPath: p1Portrait,
         relatedPersonId: p2.id,
-        relatedPersonName: personDisplayName(p2),
-        description: `${personDisplayName(p1)} menikah dengan ${personDisplayName(p2)}`,
+        relatedPersonName: p2Name,
+        relatedPersonGender: p2.gender,
+        relatedPersonPortraitPath: p2Portrait,
+        description: `Pernikahan ${p1Name} & ${p2Name}`,
+        ageAtEvent: ageP1,
       });
     }
 
-    // Divorce / ended
+    // Divorce / ended event
     if (union.end_date && (union.status === "divorced" || union.status === "ended")) {
+      const isDivorce = union.status === "divorced";
       events.push({
         id: `divorce-${union.id}`,
-        type: union.status === "divorced" ? "divorce" : "divorce",
+        type: isDivorce ? "divorce" : "divorce",
         date: union.end_date,
         dateDisplay: formatDate(union.end_date, union.end_date_precision),
         year: getYear(union.end_date),
-        precision: union.end_date_precision as "exact" | "year" | "month" | "unknown",
+        precision: (union.end_date_precision as any) || "exact",
         personId: p1.id,
-        personName: personDisplayName(p1),
+        personName: p1Name,
         personGender: p1.gender,
+        personPortraitPath: p1Portrait,
         relatedPersonId: p2.id,
-        relatedPersonName: personDisplayName(p2),
-        description:
-          union.status === "divorced"
-            ? `${personDisplayName(p1)} dan ${personDisplayName(p2)} bercerai`
-            : `Pernikahan ${personDisplayName(p1)} dan ${personDisplayName(p2)} berakhir`,
+        relatedPersonName: p2Name,
+        relatedPersonGender: p2.gender,
+        relatedPersonPortraitPath: p2Portrait,
+        description: isDivorce
+          ? `Perceraian ${p1Name} & ${p2Name}`
+          : `Pernikahan ${p1Name} & ${p2Name} berakhir`,
       });
     }
   }
 
-  // Sort by date ascending
+  // Sort chronologically ascending
   events.sort((a, b) => {
     if (a.date < b.date) return -1;
     if (a.date > b.date) return 1;
@@ -198,6 +238,7 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
 export function groupByDecade(events: TimelineEvent[]): Map<number, TimelineEvent[]> {
   const map = new Map<number, TimelineEvent[]>();
   for (const evt of events) {
+    if (!evt.year) continue;
     const decade = Math.floor(evt.year / 10) * 10;
     if (!map.has(decade)) map.set(decade, []);
     map.get(decade)!.push(evt);

@@ -40,6 +40,8 @@ export function QuickAddMemberModal({
   const [lifeStatus, setLifeStatus] = useState<"living" | "deceased">("living");
   const [birthDate, setBirthDate] = useState("");
   const [deathDate, setDeathDate] = useState("");
+  const [marriageDate, setMarriageDate] = useState("");
+  const [marriageStatus, setMarriageStatus] = useState<"active" | "widowed" | "divorced" | "ended">("active");
   const [biologicalStatus, setBiologicalStatus] = useState<"biological" | "adoptive" | "step">("biological");
   const [selectedSpouseId, setSelectedSpouseId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
@@ -54,6 +56,8 @@ export function QuickAddMemberModal({
     setSuffixTitle("");
     setBirthDate("");
     setDeathDate("");
+    setMarriageDate("");
+    setMarriageStatus("active");
     setBiologicalStatus("biological");
 
     if (actionType === "add_father") {
@@ -176,7 +180,8 @@ export function QuickAddMemberModal({
           person_a_id: targetPerson.id,
           person_b_id: newPerson.id,
           relationship_type: "marriage",
-          status: "active",
+          start_date: marriageDate || undefined,
+          status: marriageStatus,
         });
       } else if (actionType === "add_child") {
         let matchedUnionId: string | undefined;
@@ -424,6 +429,38 @@ export function QuickAddMemberModal({
                   <option value="biological">Anak Kandung</option>
                   <option value="adoptive">Anak Adopsi</option>
                   <option value="step">Anak Tiri</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Jika Aksi Tambah Pasangan: Tanggal & Status Pernikahan */}
+          {actionType === "add_spouse" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-[var(--subtle)]/40 border border-[var(--border)]">
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                  Tanggal Pernikahan (Opsional)
+                </label>
+                <input
+                  type="date"
+                  value={marriageDate}
+                  onChange={(e) => setMarriageDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--surface)] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                  Status Hubungan Pernikahan
+                </label>
+                <select
+                  value={marriageStatus}
+                  onChange={(e) => setMarriageStatus(e.target.value as any)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--surface)] outline-none"
+                >
+                  <option value="active">Menikah (Aktif)</option>
+                  <option value="widowed">Duda / Janda</option>
+                  <option value="divorced">Bercerai</option>
+                  <option value="ended">Berakhir</option>
                 </select>
               </div>
             </div>
