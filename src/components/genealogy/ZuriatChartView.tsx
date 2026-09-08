@@ -189,23 +189,83 @@ export function ZuriatChartView({
     return parentIds.map((id) => peopleMap.get(id)).filter((p): p is PersonWithPortrait => !!p);
   }, [mainSpouse, childToParents, peopleMap]);
 
-  // Struktur Kolom Anak-Cucu-Cicit dari Tokoh Utama
+  // Helper untuk mengurutkan daftar anak berdasarkan custom order (localStorage), sort_order (DB), atau birth_date
+  const sortChildrenIds = useCallback(
+    (parentId: string, childrenIds: string[], unionId?: string | null): string[] => {
+      if (childrenIds.length <= 1) return childrenIds;
+
+      // 1. Ambil custom order dari localStorage jika ada
+      let customOrder: string[] = [];
+      try {
+        const raw = localStorage.getItem("silsilah_child_order_v1");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          customOrder = parsed[parentId] || (unionId ? parsed[unionId] : []) || [];
+          if (customOrder.length === 0) {
+            const spouseData = getSpouse(parentId);
+            if (spouseData.spouse && parsed[spouseData.spouse.id]?.length > 0) {
+              customOrder = parsed[spouseData.spouse.id];
+            }
+          }
+        }
+      } catch (e) {}
+
+      // 2. Sort children
+      return [...childrenIds].sort((aId, bId) => {
+        const pA = peopleMap.get(aId);
+        const pB = peopleMap.get(bId);
+        if (!pA || !pB) return 0;
+
+        // Prioritas 1: Custom order (drag to reorder)
+        if (customOrder.length > 0) {
+          const idxA = customOrder.indexOf(aId);
+          const idxB = customOrder.indexOf(bId);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+        }
+
+        // Prioritas 2: DB sort_order
+        const relA = parentChildRels.find((r) => r.child_id === aId && r.parent_id === parentId);
+        const relB = parentChildRels.find((r) => r.child_id === bId && r.parent_id === parentId);
+        if (relA && relB && typeof relA.sort_order === "number" && typeof relB.sort_order === "number") {
+          if (relA.sort_order !== relB.sort_order) return relA.sort_order - relB.sort_order;
+        }
+
+        // Prioritas 3: Tanggal lahir (tertua di kiri / urutan awal)
+        if (pA.birth_date && pB.birth_date) {
+          return pA.birth_date.localeCompare(pB.birth_date);
+        }
+        if (pA.birth_date) return -1;
+        if (pB.birth_date) return 1;
+
+        return pA.full_name.localeCompare(pB.full_name);
+      });
+    },
+    [peopleMap, parentChildRels, personToUnions, unionToMembers]
+  );
+
+  // Struktur Kolom Anak-Cucu-Cicit dari Tokoh Utama (dengan urutan persis)
   const childColumns: ChildColumn[] = useMemo(() => {
     if (!mainPerson) return [];
-    const childIds = parentToChildren.get(mainPerson.id) || [];
+    const rawChildIds = parentToChildren.get(mainPerson.id) || [];
+    const mainUnionId = getSpouse(mainPerson.id).union?.id;
+    const childIds = sortChildrenIds(mainPerson.id, rawChildIds, mainUnionId);
 
     return childIds.map((cId) => {
       const child = peopleMap.get(cId)!;
       const { spouse, union } = getSpouse(cId);
 
-      // Cucu (Anak dari child ini)
-      const cucuIds = parentToChildren.get(cId) || [];
+      // Cucu (Anak dari child ini) - Terurut rapi
+      const rawCucuIds = parentToChildren.get(cId) || [];
+      const cucuIds = sortChildrenIds(cId, rawCucuIds, union?.id);
       const cucuList: CucuNode[] = cucuIds.map((gcId) => {
         const gcChild = peopleMap.get(gcId)!;
         const gcSpouseData = getSpouse(gcId);
 
-        // Cicit (Anak dari cucu ini)
-        const cicitIds = parentToChildren.get(gcId) || [];
+        // Cicit (Anak dari cucu ini) - Terurut rapi
+        const rawCicitIds = parentToChildren.get(gcId) || [];
+        const cicitIds = sortChildrenIds(gcId, rawCicitIds, gcSpouseData.union?.id);
         const cicitList: CicitNode[] = cicitIds.map((ggcId) => {
           const ggcChild = peopleMap.get(ggcId)!;
           const ggcSpouseData = getSpouse(ggcId);
@@ -230,7 +290,7 @@ export function ZuriatChartView({
         cucu: cucuList,
       };
     });
-  }, [mainPerson, parentToChildren, peopleMap, personToUnions, unionToMembers]);
+  }, [mainPerson, parentToChildren, peopleMap, personToUnions, unionToMembers, sortChildrenIds]);
 
   if (!mainPerson) {
     return <div className="p-8 text-center text-muted">Data silsilah belum tersedia.</div>;
@@ -787,7 +847,7 @@ export function ZuriatChartView({
               width: "100%",
             }}
           >
-            {childColumns.map((col) => (
+            {childColumns.map((col, colIdx) => (
               <div
                 key={col.child.id}
                 style={{
@@ -840,7 +900,7 @@ export function ZuriatChartView({
                       {formatNameWithTitle(col.child)}
                     </div>
                     <div style={{ fontSize: "10px", fontWeight: 700, color: "#92400E", marginTop: "2px" }}>
-                      ANAK KANDUNG
+                      ANAK KE-{colIdx + 1}
                     </div>
                   </button>
 
@@ -895,7 +955,7 @@ export function ZuriatChartView({
                       borderLeft: "2px dashed rgba(254, 240, 138, 0.4)",
                     }}
                   >
-                    {col.cucu.map((gc) => (
+                    {col.cucu.map((gc, gcIdx) => (
                       <div
                         key={gc.child.id}
                         style={{
@@ -935,7 +995,7 @@ export function ZuriatChartView({
                               {formatNameWithTitle(gc.child)}
                             </div>
                             <div style={{ fontSize: "9px", color: "#1D4ED8", fontWeight: 700 }}>
-                              CUCU (ANAK KANDUNG)
+                              CUCU KE-{gcIdx + 1}
                             </div>
                           </button>
 
