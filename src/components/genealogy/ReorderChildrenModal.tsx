@@ -258,14 +258,14 @@ export function ReorderChildrenModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="reorder-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
     >
       <div
-        className="bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[85vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border)] bg-gradient-to-r from-emerald-500/10 via-transparent to-teal-500/10">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[var(--border)] bg-gradient-to-r from-emerald-500/10 via-transparent to-teal-500/10 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <ListOrdered className="w-5 h-5" />
@@ -406,22 +406,23 @@ export function ReorderChildrenModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-[var(--border)] bg-[var(--surface)] flex flex-wrap items-center justify-between gap-2.5">
+        <div className="p-3.5 sm:p-4 border-t border-[var(--border)] bg-[var(--surface)] flex items-center justify-between gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={handleResetToBirthDate}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--subtle)] border border-[var(--border)] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--subtle)] border border-[var(--border)] transition-colors cursor-pointer"
             title="Urutkan otomatis tertua ke termuda berdasarkan tanggal lahir"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Sesuai Tgl Lahir</span>
+            <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden xs:inline sm:inline">Sesuai Tgl Lahir</span>
+            <span className="xs:hidden sm:hidden">Tgl Lahir</span>
           </button>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium rounded-xl border border-[var(--border)] hover:bg-[var(--subtle)] transition-colors cursor-pointer"
+              className="px-3 sm:px-4 py-2 text-xs font-medium rounded-xl border border-[var(--border)] hover:bg-[var(--subtle)] transition-colors cursor-pointer"
             >
               Batal
             </button>
@@ -429,7 +430,7 @@ export function ReorderChildrenModal({
               type="button"
               onClick={handleSaveOrder}
               disabled={saving || childrenList.length <= 1}
-              className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-md hover:shadow-lg disabled:opacity-50 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-md hover:shadow-lg disabled:opacity-50 transition-all cursor-pointer"
             >
               {saving ? (
                 <>
