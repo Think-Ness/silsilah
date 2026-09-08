@@ -239,15 +239,15 @@ export function QuickAddMemberModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in-0"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-150"
+        className="relative w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--subtle)]/50">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--subtle)]/50 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-xs">
               {meta.icon}
@@ -272,7 +272,8 @@ export function QuickAddMemberModal({
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="overflow-y-auto flex-1 p-4 sm:p-5 space-y-4">
           {/* Gelar Depan & Nama Lengkap */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-1">
@@ -458,7 +459,6 @@ export function QuickAddMemberModal({
                   className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--surface)] outline-none"
                 >
                   <option value="active">Menikah (Aktif)</option>
-                  <option value="widowed">Duda / Janda</option>
                   <option value="divorced">Bercerai</option>
                   <option value="ended">Berakhir</option>
                 </select>
@@ -493,33 +493,34 @@ export function QuickAddMemberModal({
               </div>
             )}
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={onClose}
-              className="px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Menyimpan...</span>
-                </>
-              ) : (
-                <span>Simpan & Tambahkan</span>
-              )}
-            </button>
-          </div>
-        </form>
+        {/* Action Buttons Footer - Sticky */}
+        <div className="flex items-center justify-end gap-2 p-3.5 sm:px-5 border-t border-[var(--border)] bg-[var(--surface)] flex-shrink-0">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onClose}
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <span>Simpan & Tambahkan</span>
+            )}
+          </button>
+        </div>
+      </form>
       </div>
     </div>
   );

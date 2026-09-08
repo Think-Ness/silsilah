@@ -41,11 +41,11 @@ export function DeletePersonDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in-0"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-150 p-6"
+        className="relative w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-y-auto max-h-[calc(100dvh-1.5rem)] animate-in zoom-in-95 duration-150 p-5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <button
