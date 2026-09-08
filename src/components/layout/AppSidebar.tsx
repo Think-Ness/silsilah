@@ -12,6 +12,9 @@ import {
   ScrollText,
   Settings,
   LayoutDashboard,
+  Clock,
+  CheckSquare,
+  Globe,
 } from "lucide-react";
 
 const navGroups = [
@@ -43,6 +46,11 @@ const navGroups = [
         label: "Hubungan",
         icon: Network,
       },
+      {
+        href: "/timeline",
+        label: "Timeline",
+        icon: Clock,
+      },
     ],
   },
   {
@@ -67,6 +75,11 @@ const navGroups = [
         href: "/admin/users",
         label: "Pengguna",
         icon: UserCog,
+      },
+      {
+        href: "/admin/approvals",
+        label: "Persetujuan",
+        icon: CheckSquare,
       },
       {
         href: "/admin/audit-log",
@@ -143,10 +156,19 @@ export function AppSidebar() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-[var(--border)]">
-        <p className="text-[11px] text-[var(--muted)]">
-          Silsilah v0.1.0
+      <div className="px-4 py-3 border-t border-[var(--border)]" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p className="text-[11px] text-[var(--muted)]" style={{ margin: 0 }}>
+          Silsilah v2.0
         </p>
+        <a
+          href="/public/tree"
+          target="_blank"
+          rel="noopener"
+          title="Pohon Keluarga Publik"
+          style={{ color: "var(--muted)", display: "flex" }}
+        >
+          <Globe size={13} />
+        </a>
       </div>
     </nav>
   );
