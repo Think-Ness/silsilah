@@ -866,27 +866,31 @@ export function buildCanvasGraph(
       height: UNION_NODE_SIZE,
     });
 
-    // Edge pernikahan cerdas: Suami <-> UnionNode <-> Istri
+    // Edge pernikahan: Suami (kanan) ke UnionNode (kiri), Istri (kiri) ke UnionNode (kanan)
     if (m1 && m2) {
       const husband = m1.gender === "male" || m2.gender === "female" ? m1 : m2;
       const wife = husband.id === m1.id ? m2 : m1;
 
-      // Garis pernikahan Suami -> UnionNode
+      // Garis pernikahan Suami (titik kanan) -> UnionNode (titik kiri)
       edges.push({
         id: `spouse-edge-${union.id}-${husband.id}`,
         source: `person-${husband.id}`,
+        sourceHandle: "right",
         target: `union-${union.id}`,
-        type: "smartMarriage",
+        targetHandle: "left",
+        type: "smoothstep",
         animated: false,
         style: { stroke: "#D97706", strokeWidth: 2 },
       });
 
-      // Garis pernikahan Istri -> UnionNode
+      // Garis pernikahan Istri (titik kiri) -> UnionNode (titik kanan)
       edges.push({
         id: `spouse-edge-${union.id}-${wife.id}`,
         source: `person-${wife.id}`,
+        sourceHandle: "left",
         target: `union-${union.id}`,
-        type: "smartMarriage",
+        targetHandle: "right",
+        type: "smoothstep",
         animated: false,
         style: { stroke: "#D97706", strokeWidth: 2 },
       });
@@ -949,27 +953,53 @@ export function buildCanvasGraph(
       }
     }
 
-    // Jika union ditemukan: buat 1 edge rapi dari UnionNode ke Child
+    // Jika union ditemukan: buat 1 edge rapi dari UnionNode (bawah) ke Child (atas)
     if (targetUnionId) {
       edges.push({
         id: `pcr-union-${targetUnionId}-${childId}`,
         source: `union-${targetUnionId}`,
+        sourceHandle: "bottom",
         target: `person-${childId}`,
-        type: "smartParentChild",
+        targetHandle: "top",
+        type: "smoothstep",
         label: edgeLabel,
+        labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
+        labelBgStyle: edgeLabel
+          ? {
+              fill: "#FFFFFF",
+              stroke: "#E5E7EB",
+              strokeWidth: 1,
+              rx: 4,
+              ry: 4,
+            }
+          : undefined,
+        labelBgPadding: edgeLabel ? [3, 5] : undefined,
         style: edgeStyle,
       });
       continue;
     }
 
-    // Fallback: jika orang tua tidak terdaftar dalam union/pernikahan, sambungkan dari parent langsung
+    // Fallback: jika orang tua tidak terdaftar dalam union/pernikahan, sambungkan dari parent (bawah) langsung ke anak (atas)
     for (const rel of rels) {
       edges.push({
         id: `pcr-${rel.id}`,
         source: `person-${rel.parent_id}`,
+        sourceHandle: "bottom",
         target: `person-${rel.child_id}`,
-        type: "smartParentChild",
+        targetHandle: "top",
+        type: "smoothstep",
         label: edgeLabel,
+        labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
+        labelBgStyle: edgeLabel
+          ? {
+              fill: "#FFFFFF",
+              stroke: "#E5E7EB",
+              strokeWidth: 1,
+              rx: 4,
+              ry: 4,
+            }
+          : undefined,
+        labelBgPadding: edgeLabel ? [3, 5] : undefined,
         style: edgeStyle,
       });
     }
