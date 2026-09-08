@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { HeartHandshake } from "lucide-react";
 import type { UnionNodeData } from "@/lib/genealogy/canvas";
@@ -14,8 +14,21 @@ interface UnionNodeProps extends NodeProps {
 export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
   const members = data.members || [];
   const info = getUnionMortalityInfo(members, data.union);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  };
 
   const handleClick = (e: React.MouseEvent) => {
+    if (dragStartRef.current) {
+      const dx = Math.abs(e.clientX - dragStartRef.current.x);
+      const dy = Math.abs(e.clientY - dragStartRef.current.y);
+      if (dx > 4 || dy > 4) {
+        // Sedang melakukan drag/geser node, abaikan klik modal
+        return;
+      }
+    }
     e.stopPropagation();
     window.dispatchEvent(
       new CustomEvent("silsilah:edit-union", {
@@ -53,10 +66,11 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
 
   const tooltipText = `Hubungan: ${info.statusLabel}${
     data.union?.start_date ? ` · Sejak ${data.union.start_date}` : ""
-  }\n${info.doaText}\n(Klik untuk edit detail)`;
+  }\n${info.doaText}\n(Klik untuk edit detail · Geser untuk memindahkan)`;
 
   return (
     <div
+      onMouseDown={handleMouseDown}
       onClick={handleClick}
       style={{
         width: 32,
@@ -74,11 +88,11 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: "pointer",
+        cursor: "grab",
         position: "relative",
         transition: "transform 150ms ease, box-shadow 150ms ease",
       }}
-      className="hover:scale-125 hover:shadow-lg group nodrag"
+      className="hover:scale-125 hover:shadow-lg group active:cursor-grabbing"
       title={tooltipText}
     >
       {/* Handle dari Suami (kiri) */}
