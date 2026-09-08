@@ -269,14 +269,30 @@ export function calculateFamilyTreePositions(
       const parentIds = [unit.personA.id];
       if (unit.personB) parentIds.push(unit.personB.id);
 
+      // Helper untuk mendapatkan objek Person anak yang sebenarnya dari unit anak (bukan menantu/pasangannya)
+      const getChildPerson = (u?: FamilyUnit): PersonWithPortrait | undefined => {
+        if (!u) return undefined;
+        if (u.type === "single") return u.personA;
+        // Pada unit pasangan, periksa apakah personA atau personB yang merupakan keturunan dari parentIds
+        const isAChild = parentIds.some((pId) => (parentToChildren.get(pId) || []).includes(u.personA.id));
+        if (isAChild) return u.personA;
+        if (u.personB) {
+          const isBChild = parentIds.some((pId) => (parentToChildren.get(pId) || []).includes(u.personB!.id));
+          if (isBChild) return u.personB;
+        }
+        return u.personA;
+      };
+
+      const originalOrder = new Map(unit.childUnitIds.map((id, idx) => [id, idx]));
+
       unit.childUnitIds.sort((aId, bId) => {
         const uA = unitMap.get(aId);
         const uB = unitMap.get(bId);
-        const pA = uA?.personA;
-        const pB = uB?.personA;
-        if (!pA || !pB) return 0;
+        const pA = getChildPerson(uA);
+        const pB = getChildPerson(uB);
+        if (!pA || !pB) return (originalOrder.get(aId) ?? 0) - (originalOrder.get(bId) ?? 0);
 
-        // 1. Prioritaskan urutan eksplisit (drag & drop modal / canvas drag)
+        // 1. Prioritaskan urutan eksplisit (drag & drop modal / custom order)
         if (explicitOrder && explicitOrder.length > 0) {
           const idxA = explicitOrder.indexOf(pA.id);
           const idxB = explicitOrder.indexOf(pB.id);
@@ -306,12 +322,16 @@ export function calculateFamilyTreePositions(
 
         // 3. Fallback: Tanggal lahir (tertua di kiri)
         if (pA.birth_date && pB.birth_date) {
-          return pA.birth_date.localeCompare(pB.birth_date);
+          const cmp = pA.birth_date.localeCompare(pB.birth_date);
+          if (cmp !== 0) return cmp;
+        } else if (pA.birth_date && !pB.birth_date) {
+          return -1;
+        } else if (!pA.birth_date && pB.birth_date) {
+          return 1;
         }
-        if (pA.birth_date) return -1;
-        if (pB.birth_date) return 1;
 
-        return 0;
+        // 4. Default: Pertahankan formasi urutan asli dari database (natural insertion order)
+        return (originalOrder.get(aId) ?? 0) - (originalOrder.get(bId) ?? 0);
       });
     }
   }
@@ -755,10 +775,12 @@ export function buildCanvasGraph(
             (pIds.length > 1 ? effectiveChildOrders.get(pIds[1]) : undefined);
         }
 
+        const originalSiblingOrder = new Map(siblings.map((id, idx) => [id, idx]));
+
         const sortedSiblings = [...siblings].sort((aId, bId) => {
           const pA = peopleMap.get(aId);
           const pB = peopleMap.get(bId);
-          if (!pA || !pB) return 0;
+          if (!pA || !pB) return (originalSiblingOrder.get(aId) ?? 0) - (originalSiblingOrder.get(bId) ?? 0);
 
           if (explicitOrder && explicitOrder.length > 0) {
             const idxA = explicitOrder.indexOf(pA.id);
@@ -774,11 +796,16 @@ export function buildCanvasGraph(
             if (relA.sort_order !== relB.sort_order) return relA.sort_order - relB.sort_order;
           }
 
-          if (pA.birth_date && pB.birth_date) return pA.birth_date.localeCompare(pB.birth_date);
-          if (pA.birth_date) return -1;
-          if (pB.birth_date) return 1;
+          if (pA.birth_date && pB.birth_date) {
+            const cmp = pA.birth_date.localeCompare(pB.birth_date);
+            if (cmp !== 0) return cmp;
+          } else if (pA.birth_date && !pB.birth_date) {
+            return -1;
+          } else if (!pA.birth_date && pB.birth_date) {
+            return 1;
+          }
 
-          return 0;
+          return (originalSiblingOrder.get(aId) ?? 0) - (originalSiblingOrder.get(bId) ?? 0);
         });
 
         const sIdx = sortedSiblings.indexOf(person.id);

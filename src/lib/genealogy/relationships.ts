@@ -234,6 +234,23 @@ export async function deleteParentChildRelationship(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Update union_id untuk parent-child relationship tertentu */
+export async function updateParentChildUnion(
+  childId: string,
+  parentId: string,
+  unionId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("parent_child_relationships")
+    .update({ union_id: unionId })
+    .eq("child_id", childId)
+    .eq("parent_id", parentId);
+
+  if (error) {
+    console.warn("Gagal update union_id parent_child_relationships:", error);
+  }
+}
+
 /** Ambil stats relationships */
 export async function getRelationshipStats(client?: any): Promise<{
   totalUnions: number;

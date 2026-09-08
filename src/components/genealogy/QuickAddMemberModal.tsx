@@ -8,6 +8,8 @@ import {
   createParentChildRelationship,
   createUnion,
   getUnionBetweenPeople,
+  getParentRelationships,
+  updateParentChildUnion,
 } from "@/lib/genealogy/relationships";
 import type { PersonWithPortrait } from "@/types/genealogy";
 
@@ -133,9 +135,39 @@ export function QuickAddMemberModal({
 
       // 2. Hubungkan relasi sesuai aksi
       if (actionType === "add_father" || actionType === "add_mother") {
+        // Cek apakah targetPerson (anak) sudah memiliki orang tua lain
+        const existingParentRels = await getParentRelationships(targetPerson.id);
+        let unionIdToLink: string | undefined;
+
+        if (existingParentRels && existingParentRels.length > 0) {
+          const coParentId = existingParentRels[0].parent_id;
+
+          // Cek apakah sudah ada simpul pernikahan (union) antara newPerson dan coParentId
+          let union = await getUnionBetweenPeople(newPerson.id, coParentId);
+
+          if (!union) {
+            // Otomatis terjalin hubungan suami-istri (pernikahan) di antara ayah dan ibu
+            const isNewMale = gender === "male";
+            union = await createUnion({
+              person_a_id: isNewMale ? newPerson.id : coParentId,
+              person_b_id: isNewMale ? coParentId : newPerson.id,
+              relationship_type: "marriage",
+              status: "active",
+            });
+          }
+
+          if (union) {
+            unionIdToLink = union.id;
+            // Update relasi orang tua yang sudah ada agar sama-sama mengarah ke simpul pernikahan
+            await updateParentChildUnion(targetPerson.id, coParentId, union.id);
+          }
+        }
+
+        // Simpan relasi orang tua baru ke anak
         await createParentChildRelationship({
           parent_id: newPerson.id,
           child_id: targetPerson.id,
+          union_id: unionIdToLink,
           relationship_type: "parent",
           biological_status: "biological",
         });
@@ -148,8 +180,21 @@ export function QuickAddMemberModal({
         });
       } else if (actionType === "add_child") {
         let matchedUnionId: string | undefined;
+
         if (selectedSpouseId) {
-          const union = await getUnionBetweenPeople(targetPerson.id, selectedSpouseId);
+          let union = await getUnionBetweenPeople(targetPerson.id, selectedSpouseId);
+
+          // Jika pasangan dipilih tapi belum ada record union di database, buat otomatis
+          if (!union) {
+            const isTargetMale = targetPerson.gender === "male";
+            union = await createUnion({
+              person_a_id: isTargetMale ? targetPerson.id : selectedSpouseId,
+              person_b_id: isTargetMale ? selectedSpouseId : targetPerson.id,
+              relationship_type: "marriage",
+              status: "active",
+            });
+          }
+
           if (union) {
             matchedUnionId = union.id;
           }
