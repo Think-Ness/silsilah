@@ -16,10 +16,13 @@ import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/Pe
 import { GenderSelector, LifeStatusSelector, DatePrecisionSelector } from "@/components/people/FormSelectors";
 import type { CreatePersonInput, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/context/UserRoleContext";
+import { ShieldAlert } from "lucide-react";
 
 export default function NewPersonPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { isViewer } = useCurrentUser();
   const [loading, setLoading] = useState(false);
   const [photoState, setPhotoState] = useState<PhotoUploadState>({
     file: null,
@@ -113,6 +116,38 @@ export default function NewPersonPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (isViewer) {
+    return (
+      <div className="page-content" style={{ maxWidth: 540, margin: "60px auto", textAlign: "center" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "32px" }}>
+          <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--foreground)", marginBottom: "8px" }}>
+            Akses Terbatas: Pengamat (Hanya-Baca)
+          </h2>
+          <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: 1.6, marginBottom: "20px" }}>
+            Akun Anda memiliki peran Pengamat (hanya-baca) dan tidak memiliki hak untuk menambahkan anggota keluarga baru.
+          </p>
+          <Link
+            href="/people"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 16px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              textDecoration: "none",
+              fontSize: "13px",
+            }}
+          >
+            <ArrowLeft className="w-4 h-4" /> Kembali ke Daftar Anggota
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

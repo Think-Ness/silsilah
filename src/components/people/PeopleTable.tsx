@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface PeopleTableProps {
   people: PersonWithPortrait[];
@@ -55,6 +56,7 @@ function LifeStatusBadge({ status }: { status: string }) {
 }
 
 export function PeopleTable({ people }: PeopleTableProps) {
+  const { canEdit, canDelete } = useCurrentUser();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   if (people.length === 0) {
@@ -169,18 +171,22 @@ export function PeopleTable({ people }: PeopleTableProps) {
                       >
                         <Eye className="w-4 h-4" /> Lihat Profil
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => window.location.href = `/people/${person.id}/edit`}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <Pencil className="w-4 h-4" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setDeleteTarget({ id: person.id, name: getDisplayName(person) })}
-                        className="text-red-600 focus:text-red-700 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600" /> Hapus Anggota
-                      </DropdownMenuItem>
+                      {canEdit && (
+                        <DropdownMenuItem
+                          onClick={() => window.location.href = `/people/${person.id}/edit`}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Pencil className="w-4 h-4" /> Edit
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <DropdownMenuItem
+                          onClick={() => setDeleteTarget({ id: person.id, name: getDisplayName(person) })}
+                          className="text-red-600 focus:text-red-700 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" /> Hapus Anggota
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>

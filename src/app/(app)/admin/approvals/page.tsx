@@ -61,6 +61,12 @@ export default async function AdminApprovalsPage() {
 
   // Hanya super_admin dan family_member yang dapat melihat approval
   if (!myProfile || (myProfile.role !== "super_admin" && myProfile.role !== "family_member")) {
+    const { count: superAdminCount } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "super_admin");
+    const hasSuperAdmin = (superAdminCount ?? 0) > 0;
+
     return (
       <div className="page-content" style={{ maxWidth: 600, margin: "60px auto" }}>
         <div
@@ -78,44 +84,58 @@ export default async function AdminApprovalsPage() {
           </h2>
           <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: 1.6, marginBottom: "20px" }}>
             Halaman persetujuan memerlukan hak akses Anggota Keluarga atau Super Admin. Anda saat ini memiliki peran{" "}
-            <strong>{myProfile?.role || "viewer"}</strong>.
+            <strong>Pengamat (Hanya-Baca)</strong>.
           </p>
-          <form
-            action={async () => {
-              "use server";
-              await claimSuperAdminRole();
-            }}
-          >
-            <button
-              type="submit"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "10px 20px",
-                borderRadius: "var(--radius-md)",
-                background: "var(--primary-color)",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 600,
-                marginBottom: "16px",
+
+          {!hasSuperAdmin ? (
+            <form
+              action={async () => {
+                "use server";
+                await claimSuperAdminRole();
               }}
             >
-              <ShieldCheck className="w-4 h-4" /> Aktifkan Hak Super Admin untuk Akun Ini
-            </button>
-          </form>
+              <button
+                type="submit"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 20px",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--primary-color)",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "16px",
+                }}
+              >
+                <ShieldCheck className="w-4 h-4" /> Inisialisasi Akun sebagai Super Admin Pertama
+              </button>
+            </form>
+          ) : (
+            <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "20px" }}>
+              Silakan hubungi administrator silsilah keluarga jika Anda memerlukan peningkatan peran akun.
+            </p>
+          )}
+
           <div>
             <Link
               href="/"
               style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
                 fontSize: "13px",
-                color: "var(--muted)",
-                textDecoration: "underline",
+                color: "var(--foreground)",
+                textDecoration: "none",
+                padding: "8px 16px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
               }}
             >
-              Kembali ke Ringkasan
+              <ArrowLeft className="w-4 h-4" /> Kembali ke Ringkasan
             </Link>
           </div>
         </div>

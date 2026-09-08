@@ -16,6 +16,8 @@ import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/Pe
 import { GenderSelector, LifeStatusSelector, DatePrecisionSelector } from "@/components/people/FormSelectors";
 import type { PersonWithPortrait, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/context/UserRoleContext";
+import { ShieldAlert } from "lucide-react";
 
 interface PersonEditFormProps {
   person: PersonWithPortrait;
@@ -24,6 +26,7 @@ interface PersonEditFormProps {
 export default function PersonEditForm({ person }: PersonEditFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { isViewer, isSuperAdmin } = useCurrentUser();
   const [loading, setLoading] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
@@ -150,6 +153,38 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
   }
 
   const displayName = [person.prefix_title, person.display_name || person.full_name].filter(Boolean).join(" ");
+
+  if (isViewer) {
+    return (
+      <div className="page-content" style={{ maxWidth: 540, margin: "60px auto", textAlign: "center" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "32px" }}>
+          <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--foreground)", marginBottom: "8px" }}>
+            Akses Terbatas: Pengamat (Hanya-Baca)
+          </h2>
+          <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: 1.6, marginBottom: "20px" }}>
+            Akun Anda memiliki peran Pengamat (hanya-baca) dan tidak memiliki hak untuk mengubah data anggota.
+          </p>
+          <Link
+            href={`/people/${person.id}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 16px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              textDecoration: "none",
+              fontSize: "13px",
+            }}
+          >
+            <ArrowLeft className="w-4 h-4" /> Kembali ke Profil Anggota
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-content" style={{ maxWidth: 640, margin: "0 auto" }}>
@@ -302,18 +337,20 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
             Batal
           </Link>
           <div style={{ flex: 1 }} />
-          <Button
-            id="archive-person-button"
-            type="button"
-            variant="outline"
-            disabled={archiving}
-            onClick={handleArchive}
-            style={{ color: "var(--destructive)", borderColor: "var(--destructive)" }}
-          >
-            {archiving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            <Archive className="w-4 h-4 mr-2" />
-            Arsipkan
-          </Button>
+          {isSuperAdmin && (
+            <Button
+              id="archive-person-button"
+              type="button"
+              variant="outline"
+              disabled={archiving}
+              onClick={handleArchive}
+              style={{ color: "var(--destructive)", borderColor: "var(--destructive)" }}
+            >
+              {archiving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Archive className="w-4 h-4 mr-2" />
+              Arsipkan
+            </Button>
+          )}
         </div>
       </form>
     </div>

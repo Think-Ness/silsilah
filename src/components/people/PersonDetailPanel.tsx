@@ -4,6 +4,7 @@ import { X, User, ArrowRight, Pencil, Trash2, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import type { PersonProfile } from "@/types/genealogy";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface PersonDetailPanelProps {
   profile: PersonProfile;
@@ -19,6 +20,7 @@ function getDisplayName(p: { prefix_title?: string | null; display_name?: string
 }
 
 export function PersonDetailPanel({ profile, onClose }: PersonDetailPanelProps) {
+  const { canEdit, canDelete } = useCurrentUser();
   const displayName = getDisplayName(profile);
   const primaryAddress = profile.addresses.find((a) => a.is_current) || profile.addresses[0];
   const whatsapp = profile.contacts.find((c) => c.contact_type === "whatsapp");
@@ -226,60 +228,67 @@ export function PersonDetailPanel({ profile, onClose }: PersonDetailPanelProps) 
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
 
-        <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-          <Link
-            href={`/people/${profile.id}/edit`}
-            style={{
-              flex: 1,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              padding: "6px 12px",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border)",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "var(--foreground)",
-              textDecoration: "none",
-            }}
-            className="hover:bg-[var(--subtle)] transition-colors"
-          >
-            <Pencil className="w-3.5 h-3.5 text-[var(--muted)]" />
-            Edit
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(
-                new CustomEvent("silsilah:delete-person", {
-                  detail: {
-                    personId: profile.id,
-                    personName: displayName,
-                  },
-                })
-              );
-            }}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              padding: "6px 12px",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid rgba(220, 38, 38, 0.3)",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "#DC2626",
-              background: "transparent",
-              cursor: "pointer",
-            }}
-            className="hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Hapus
-          </button>
-        </div>
+        {(canEdit || canDelete) && (
+          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            {canEdit && (
+              <Link
+                href={`/people/${profile.id}/edit`}
+                style={{
+                  flex: 1,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  color: "var(--foreground)",
+                  textDecoration: "none",
+                }}
+                className="hover:bg-[var(--subtle)] transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5 text-[var(--muted)]" />
+                Edit Profil
+              </Link>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("silsilah:delete-person", {
+                      detail: {
+                        personId: profile.id,
+                        personName: displayName,
+                      },
+                    })
+                  );
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid rgba(220, 38, 38, 0.3)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  color: "#DC2626",
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+                className="hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                title="Hapus Anggota (Khusus Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );

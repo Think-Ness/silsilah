@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { PersonProfile } from "@/types/genealogy";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface PersonBottomSheetProps {
   profile: PersonProfile;
@@ -20,6 +21,7 @@ function getDisplayName(p: { prefix_title?: string | null; display_name?: string
 }
 
 export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) {
+  const { isViewer, canEdit, canDelete } = useCurrentUser();
   const displayName = getDisplayName(profile);
   const primaryAddress = profile.addresses.find((a) => a.is_current) || profile.addresses[0];
   const isDeceased = profile.life_status === "deceased";
@@ -108,54 +110,56 @@ export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) 
             </div>
           </div>
 
-          {/* Quick Relationship Actions for Mobile (Tanpa perlu hover) */}
-          <div className="bg-[var(--subtle)]/60 p-3 rounded-xl border border-[var(--border)]">
-            <div className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">
-              Tambah Relasi Cepat
+          {/* Quick Relationship Actions for Mobile (Tanpa perlu hover) — Tersembunyi untuk Viewer */}
+          {!isViewer && (
+            <div className="bg-[var(--subtle)]/60 p-3 rounded-xl border border-[var(--border)]">
+              <div className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">
+                Tambah Relasi Cepat
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {!hasFather && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAdd("add_father")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    <UserPlus className="w-3 h-3 text-blue-300" />
+                    <span>+ Ayah</span>
+                  </button>
+                )}
+                {!hasMother && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAdd("add_mother")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-rose-600 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    <UserPlus className="w-3 h-3 text-rose-300" />
+                    <span>+ Ibu</span>
+                  </button>
+                )}
+                {canAddSpouse && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAdd("add_spouse")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-amber-600 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Heart className="w-3 h-3 text-amber-300" />
+                    <span>{profile.gender === "male" ? "+ Istri" : profile.gender === "female" ? "+ Suami" : "+ Pasangan"}</span>
+                  </button>
+                )}
+                {canAddChild && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAdd("add_child")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-800 hover:bg-emerald-700 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3 text-emerald-200" />
+                    <span>+ Anak</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {!hasFather && (
-                <button
-                  type="button"
-                  onClick={() => handleQuickAdd("add_father")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <UserPlus className="w-3 h-3 text-blue-300" />
-                  <span>+ Ayah</span>
-                </button>
-              )}
-              {!hasMother && (
-                <button
-                  type="button"
-                  onClick={() => handleQuickAdd("add_mother")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-rose-600 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <UserPlus className="w-3 h-3 text-rose-300" />
-                  <span>+ Ibu</span>
-                </button>
-              )}
-              {canAddSpouse && (
-                <button
-                  type="button"
-                  onClick={() => handleQuickAdd("add_spouse")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-amber-600 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <Heart className="w-3 h-3 text-amber-300" />
-                  <span>{profile.gender === "male" ? "+ Istri" : profile.gender === "female" ? "+ Suami" : "+ Pasangan"}</span>
-                </button>
-              )}
-              {canAddChild && (
-                <button
-                  type="button"
-                  onClick={() => handleQuickAdd("add_child")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-800 hover:bg-emerald-700 text-white text-[11px] font-medium shadow-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-3 h-3 text-emerald-200" />
-                  <span>+ Anak</span>
-                </button>
-              )}
-            </div>
-          </div>
+          )}
 
           {/* Silsilah Family Info */}
           <div className="space-y-3 pt-1">
@@ -222,33 +226,40 @@ export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) 
             <ArrowRight className="w-4 h-4" />
           </Link>
 
-          <div className="flex gap-2">
-            <Link
-              href={`/people/${profile.id}/edit`}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"
-            >
-              <Pencil className="w-3.5 h-3.5 text-[var(--muted)]" />
-              Edit Profil
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                window.dispatchEvent(
-                  new CustomEvent("silsilah:delete-person", {
-                    detail: {
-                      personId: profile.id,
-                      personName: displayName,
-                    },
-                  })
-                );
-              }}
-              className="inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg border border-red-200 dark:border-red-950/40 text-[12px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Hapus
-            </button>
-          </div>
+          {(canEdit || canDelete) && (
+            <div className="flex gap-2">
+              {canEdit && (
+                <Link
+                  href={`/people/${profile.id}/edit`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-[var(--muted)]" />
+                  Edit Profil
+                </Link>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    window.dispatchEvent(
+                      new CustomEvent("silsilah:delete-person", {
+                        detail: {
+                          personId: profile.id,
+                          personName: displayName,
+                        },
+                      })
+                    );
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg border border-red-200 dark:border-red-950/40 text-[12px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
+                  title="Hapus Anggota (Khusus Super Admin)"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

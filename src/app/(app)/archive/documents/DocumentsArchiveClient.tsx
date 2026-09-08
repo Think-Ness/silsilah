@@ -30,6 +30,7 @@ import {
 import { formatBytes } from "@/lib/utils/image-compression";
 import type { PersonWithPortrait } from "@/types/genealogy";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface DocumentsArchiveClientProps {
   initialDocuments: MediaWithPerson[];
@@ -53,6 +54,7 @@ export function DocumentsArchiveClient({
   initialDocuments,
   people,
 }: DocumentsArchiveClientProps) {
+  const { canUpload } = useCurrentUser();
   const [documents, setDocuments] = useState<MediaWithPerson[]>(initialDocuments);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua Kategori");
@@ -254,14 +256,16 @@ export function DocumentsArchiveClient({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsUploadOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition-all duration-200 cursor-pointer active:scale-98"
-        >
-          <Upload className="w-4 h-4" />
-          <span>Unggah Dokumen</span>
-        </button>
+        {canUpload && (
+          <button
+            type="button"
+            onClick={() => setIsUploadOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition-all duration-200 cursor-pointer active:scale-98"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Unggah Dokumen</span>
+          </button>
+        )}
       </div>
 
       {/* Filter & Search Bar */}

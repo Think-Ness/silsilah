@@ -27,6 +27,7 @@ import {
 import { compressImage, formatBytes, type CompressedImageResult } from "@/lib/utils/image-compression";
 import type { PersonWithPortrait } from "@/types/genealogy";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface PhotosArchiveClientProps {
   initialPhotos: MediaWithPerson[];
@@ -37,6 +38,7 @@ export function PhotosArchiveClient({
   initialPhotos,
   people,
 }: PhotosArchiveClientProps) {
+  const { canUpload } = useCurrentUser();
   const [photos, setPhotos] = useState<MediaWithPerson[]>(initialPhotos);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>("all");
@@ -224,14 +226,16 @@ export function PhotosArchiveClient({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsUploadOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-all duration-200 cursor-pointer active:scale-98"
-        >
-          <Upload className="w-4 h-4" />
-          <span>Unggah Foto</span>
-        </button>
+        {canUpload && (
+          <button
+            type="button"
+            onClick={() => setIsUploadOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-all duration-200 cursor-pointer active:scale-98"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Unggah Foto</span>
+          </button>
+        )}
       </div>
 
       {/* Filter & Search Bar */}

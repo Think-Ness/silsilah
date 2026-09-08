@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { Search, UserCircle, LogOut } from "lucide-react";
+import { Search, UserCircle, LogOut, Crown, Shield, Eye } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,15 +13,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { createClient } from "@/lib/supabase/client";
+import type { Profile } from "@/lib/admin/types";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface AppHeaderProps {
   user: User;
+  profile?: Profile | null;
 }
 
-export function AppHeader({ user }: AppHeaderProps) {
+export function AppHeader({ user, profile: initialProfile }: AppHeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const { role, isSuperAdmin, isFamilyMember } = useCurrentUser();
+
+  const roleLabel = isSuperAdmin
+    ? "Super Admin"
+    : isFamilyMember
+    ? "Anggota Keluarga"
+    : "Pengamat (Hanya-Baca)";
+
+  const roleColor = isSuperAdmin
+    ? "#7c3aed"
+    : isFamilyMember
+    ? "#0284c7"
+    : "#64748b";
+
+  const RoleIcon = isSuperAdmin ? Crown : isFamilyMember ? Shield : Eye;
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -57,20 +75,64 @@ export function AppHeader({ user }: AppHeaderProps) {
         <DropdownMenu>
           <DropdownMenuTrigger
             id="user-menu-trigger"
-            className="flex items-center gap-1.5 p-1.5 rounded-md hover:bg-[var(--subtle)] transition-colors"
+            className="flex items-center gap-2 p-1.5 rounded-md hover:bg-[var(--subtle)] transition-colors cursor-pointer"
             aria-label="Menu pengguna"
           >
-            <UserCircle className="w-5 h-5 text-[var(--muted)]" />
-            <span className="hidden sm:inline text-[13px] text-[var(--muted)]">
-              {user.email?.split("@")[0]}
-            </span>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: `${roleColor}20`,
+                color: roleColor,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              {(user.email?.[0] || "U").toUpperCase()}
+            </div>
+            <div className="hidden sm:flex flex-col items-start leading-tight">
+              <span className="text-[12px] font-600 text-[var(--foreground)] max-w-[120px] truncate">
+                {initialProfile?.full_name || user.email?.split("@")[0]}
+              </span>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: roleColor,
+                }}
+              >
+                {roleLabel}
+              </span>
+            </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <div className="px-3 py-2">
-              <p className="text-[13px] font-500 text-[var(--foreground)]">
+          <DropdownMenuContent align="end" className="w-56 p-2">
+            <div className="px-2 py-1.5">
+              <p className="text-[13px] font-600 text-[var(--foreground)] truncate">
+                {initialProfile?.full_name || user.email}
+              </p>
+              <p className="text-[11px] text-[var(--muted)] truncate mb-2">
                 {user.email}
               </p>
-              <p className="text-[11px] text-[var(--muted)]">Super Admin</p>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: `${roleColor}15`,
+                  color: roleColor,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                <RoleIcon size={11} />
+                <span>{roleLabel}</span>
+              </div>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem

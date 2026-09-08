@@ -40,7 +40,7 @@ interface UserManagementClientProps {
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: "Super Admin",
   family_member: "Anggota Keluarga",
-  viewer: "Penonton",
+  viewer: "Pengamat (Hanya-Baca)",
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
@@ -444,7 +444,7 @@ export function UserManagementClient({
                       >
                         <option value="super_admin">Super Admin</option>
                         <option value="family_member">Anggota Keluarga</option>
-                        <option value="viewer">Penonton</option>
+                        <option value="viewer">Pengamat (Hanya-Baca)</option>
                       </select>
                       <ChevronDown
                         size={12}
@@ -664,9 +664,9 @@ export function UserManagementClient({
                   {(["super_admin", "family_member", "viewer"] as UserRole[]).map((role) => {
                     const Icon = ROLE_ICONS[role];
                     const descriptions: Record<UserRole, string> = {
-                      super_admin: "Akses penuh: edit, hapus, approve, kelola pengguna",
-                      family_member: "Dapat submit perubahan untuk disetujui admin",
-                      viewer: "Hanya dapat melihat data silsilah",
+                      super_admin: "Akses penuh: kelola pengguna, persetujuan, audit log, tambah/edit/hapus silsilah",
+                      family_member: "Akses anggota: dapat menambah & mengedit silsilah, unggah foto/dokumen arsip",
+                      viewer: "Akses hanya-baca: dapat menjelajah silsilah & cetak bagan tanpa hak ubah/tambah/hapus",
                     };
                     return (
                       <label
@@ -985,8 +985,8 @@ function InvitationCard({
 
   const roleLabels: Record<string, string> = {
     super_admin: "Super Admin",
-    family_member: "Anggota",
-    viewer: "Penonton",
+    family_member: "Anggota Keluarga",
+    viewer: "Pengamat (Hanya-Baca)",
   };
 
   return (

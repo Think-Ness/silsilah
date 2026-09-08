@@ -15,7 +15,11 @@ import {
   Clock,
   CheckSquare,
   Globe,
+  Crown,
+  Shield,
+  Eye,
 } from "lucide-react";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 const navGroups = [
   {
@@ -70,6 +74,7 @@ const navGroups = [
   },
   {
     label: "Administrasi",
+    adminOnly: true,
     items: [
       {
         href: "/admin/users",
@@ -97,6 +102,12 @@ const navGroups = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isSuperAdmin, isFamilyMember, isViewer } = useCurrentUser();
+
+  // Filter groups: jika adminOnly, hanya tampil untuk super_admin
+  const visibleGroups = navGroups.filter(
+    (group) => !group.adminOnly || isSuperAdmin
+  );
 
   return (
     <nav className="app-sidebar" aria-label="Navigasi utama">
@@ -120,7 +131,7 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-        {navGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi}>
             {group.label && (
               <div className="px-2 mb-1">
@@ -155,20 +166,59 @@ export function AppSidebar() {
         ))}
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-[var(--border)]" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p className="text-[11px] text-[var(--muted)]" style={{ margin: 0 }}>
-          Silsilah v2.0
-        </p>
-        <a
-          href="/public/tree"
-          target="_blank"
-          rel="noopener"
-          title="Pohon Keluarga Publik"
-          style={{ color: "var(--muted)", display: "flex" }}
+      {/* Footer & Role Badge */}
+      <div className="px-3.5 py-3 border-t border-[var(--border)] space-y-2">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Peran Anda
+          </span>
+          <a
+            href="/public/tree"
+            target="_blank"
+            rel="noopener"
+            title="Pohon Keluarga Publik"
+            style={{ color: "var(--muted)", display: "flex", alignItems: "center", gap: 3, fontSize: 11 }}
+          >
+            <Globe size={12} />
+            <span>Publik</span>
+          </a>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "5px 8px",
+            borderRadius: "var(--radius-xs)",
+            background: isSuperAdmin
+              ? "rgba(124, 58, 237, 0.12)"
+              : isFamilyMember
+              ? "rgba(14, 165, 233, 0.12)"
+              : "rgba(100, 116, 139, 0.12)",
+            color: isSuperAdmin
+              ? "#7c3aed"
+              : isFamilyMember
+              ? "#0284c7"
+              : "#64748b",
+            fontSize: "11px",
+            fontWeight: 600,
+          }}
         >
-          <Globe size={13} />
-        </a>
+          {isSuperAdmin ? (
+            <Crown size={12} className="flex-shrink-0" />
+          ) : isFamilyMember ? (
+            <Shield size={12} className="flex-shrink-0" />
+          ) : (
+            <Eye size={12} className="flex-shrink-0" />
+          )}
+          <span className="truncate">
+            {isSuperAdmin
+              ? "Super Admin"
+              : isFamilyMember
+              ? "Anggota Keluarga"
+              : "Pengamat (Read-Only)"}
+          </span>
+        </div>
       </div>
     </nav>
   );

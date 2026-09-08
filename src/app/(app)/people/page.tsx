@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Plus, Filter } from "lucide-react";
+import { Plus } from "lucide-react";
 import { PeopleTable } from "@/components/people/PeopleTable";
 import { getAllPeople } from "@/lib/genealogy/people";
+import { getOrBootstrapUserProfile } from "@/lib/admin/users";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -11,7 +12,12 @@ export const metadata = {
 
 export default async function PeoplePage() {
   const supabase = await createClient();
-  const people = await getAllPeople(undefined, supabase);
+  const [{ profile }, people] = await Promise.all([
+    getOrBootstrapUserProfile(supabase),
+    getAllPeople(undefined, supabase),
+  ]);
+
+  const canAdd = profile?.role === "super_admin" || profile?.role === "family_member";
 
   return (
     <div className="page-content">
@@ -20,26 +26,28 @@ export default async function PeoplePage() {
           <h1 className="page-title">Anggota Keluarga</h1>
           <p className="page-subtitle">{people.length} anggota terdokumentasi</p>
         </div>
-        <Link
-          href="/people/new"
-          id="add-person-button"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "7px",
-            padding: "8px 16px",
-            background: "var(--foreground)",
-            color: "var(--surface)",
-            borderRadius: "var(--radius-md)",
-            fontSize: "13px",
-            fontWeight: 500,
-            textDecoration: "none",
-            flexShrink: 0,
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Anggota
-        </Link>
+        {canAdd && (
+          <Link
+            href="/people/new"
+            id="add-person-button"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              padding: "8px 16px",
+              background: "var(--foreground)",
+              color: "var(--surface)",
+              borderRadius: "var(--radius-md)",
+              fontSize: "13px",
+              fontWeight: 500,
+              textDecoration: "none",
+              flexShrink: 0,
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Tambah Anggota
+          </Link>
+        )}
       </div>
 
       {/* Table */}

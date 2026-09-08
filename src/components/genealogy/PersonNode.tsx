@@ -5,6 +5,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { User, UserPlus, Heart, Plus, Trash2, ArrowUpDown, ListOrdered } from "lucide-react";
 import type { PersonNodeData } from "@/lib/genealogy/canvas";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 interface PersonNodeProps extends NodeProps {
   data: PersonNodeData;
@@ -52,7 +53,8 @@ export const PersonNode = memo(function PersonNode({
     };
   }, []);
 
-  const showActions = isHovered || !!selected;
+  const { isViewer, isSuperAdmin } = useCurrentUser();
+  const showActions = !isViewer && (isHovered || !!selected);
 
   const handleQuickAdd = (
     e: React.MouseEvent,
@@ -219,15 +221,17 @@ export const PersonNode = memo(function PersonNode({
             <span>Ibu</span>
           </button>
         )}
-        <button
-          type="button"
-          onClick={handleDelete}
-          title="Hapus Anggota"
-          aria-label="Hapus Anggota"
-          className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-900/95 hover:bg-red-600 text-slate-300 hover:text-white backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            title="Hapus Anggota (Khusus Super Admin)"
+            aria-label="Hapus Anggota"
+            className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-900/95 hover:bg-red-600 text-slate-300 hover:text-white backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
       </div>
 
       {/* Floating Action Button: Side (+ Pasangan) */}
