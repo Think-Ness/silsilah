@@ -224,11 +224,31 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
     }
   }
 
+function parseEventTimestamp(dateStr: string): number {
+  if (!dateStr) return 0;
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return new Date(y, m, d).getTime();
+  } else if (parts.length === 2) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    return new Date(y, m, 1).getTime();
+  } else if (parts.length === 1) {
+    const y = parseInt(parts[0], 10);
+    return new Date(y, 0, 1).getTime();
+  }
+  return new Date(dateStr).getTime() || 0;
+}
+
   // Sort chronologically ascending
   events.sort((a, b) => {
-    if (a.date < b.date) return -1;
-    if (a.date > b.date) return 1;
-    return 0;
+    const tA = parseEventTimestamp(a.date);
+    const tB = parseEventTimestamp(b.date);
+    if (tA !== tB) return tA - tB;
+    return a.id.localeCompare(b.id);
   });
 
   return events;

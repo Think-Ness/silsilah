@@ -18,7 +18,10 @@ import {
   ArrowRight,
   Plus,
   RotateCcw,
-  Sparkle,
+  BookOpen,
+  ArrowDownUp,
+  Clock,
+  Milestone,
 } from "lucide-react";
 
 interface TimelinePageClientProps {
@@ -44,6 +47,7 @@ const EVENT_CONFIG: Record<
     border: string;
     badgeBg: string;
     label: string;
+    storyCategory: string;
   }
 > = {
   birth: {
@@ -53,6 +57,7 @@ const EVENT_CONFIG: Record<
     border: "rgba(22, 163, 74, 0.25)",
     badgeBg: "rgba(22, 163, 74, 0.12)",
     label: "Kelahiran",
+    storyCategory: "Kelahiran Anggota Keluarga",
   },
   death: {
     icon: Moon,
@@ -61,6 +66,7 @@ const EVENT_CONFIG: Record<
     border: "rgba(100, 116, 139, 0.25)",
     badgeBg: "rgba(100, 116, 139, 0.12)",
     label: "Wafat",
+    storyCategory: "Penghormatan & Kenangan",
   },
   marriage: {
     icon: HeartHandshake,
@@ -69,6 +75,7 @@ const EVENT_CONFIG: Record<
     border: "rgba(225, 29, 72, 0.25)",
     badgeBg: "rgba(225, 29, 72, 0.12)",
     label: "Pernikahan",
+    storyCategory: "Ikatan Suci Pernikahan",
   },
   divorce: {
     icon: Scissors,
@@ -77,6 +84,7 @@ const EVENT_CONFIG: Record<
     border: "rgba(217, 119, 6, 0.25)",
     badgeBg: "rgba(217, 119, 6, 0.12)",
     label: "Perceraian",
+    storyCategory: "Perubahan Status Hubungan",
   },
   widowed: {
     icon: Moon,
@@ -85,8 +93,21 @@ const EVENT_CONFIG: Record<
     border: "rgba(124, 58, 237, 0.25)",
     badgeBg: "rgba(124, 58, 237, 0.12)",
     label: "Duda / Janda",
+    storyCategory: "Perubahan Status Hubungan",
   },
 };
+
+function parseEventTime(dateStr: string): number {
+  if (!dateStr) return 0;
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return new Date(y, m, d).getTime();
+  }
+  return new Date(dateStr).getTime() || 0;
+}
 
 export function TimelinePageClient({
   events,
@@ -97,6 +118,8 @@ export function TimelinePageClient({
   const router = useRouter();
   const [typeFilter, setTypeFilter] = useState<"all" | TimelineEventType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [viewMode, setViewMode] = useState<"story" | "decade">("story");
 
   function handlePersonFilter(personId: string) {
     if (personId) {
@@ -115,7 +138,7 @@ export function TimelinePageClient({
 
   // Filter events based on search and type
   const filteredEvents = useMemo(() => {
-    return events.filter((evt) => {
+    const result = events.filter((evt) => {
       if (typeFilter !== "all" && evt.type !== typeFilter) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -128,7 +151,18 @@ export function TimelinePageClient({
       }
       return true;
     });
-  }, [events, typeFilter, searchQuery]);
+
+    // Sort based on user selected order
+    return result.sort((a, b) => {
+      const timeA = parseEventTime(a.date);
+      const timeB = parseEventTime(b.date);
+      if (sortOrder === "asc") {
+        return timeA - timeB;
+      } else {
+        return timeB - timeA;
+      }
+    });
+  }, [events, typeFilter, searchQuery, sortOrder]);
 
   // Regroup filtered events by decade
   const filteredDecadesArr = useMemo(() => {
@@ -139,13 +173,18 @@ export function TimelinePageClient({
       if (!map.has(decade)) map.set(decade, []);
       map.get(decade)!.push(evt);
     }
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [filteredEvents]);
+    const arr = Array.from(map.entries());
+    return sortOrder === "asc" ? arr.sort((a, b) => a[0] - b[0]) : arr.sort((a, b) => b[0] - a[0]);
+  }, [filteredEvents, sortOrder]);
 
   // Overall counts
   const birthCount = events.filter((e) => e.type === "birth").length;
   const marriageCount = events.filter((e) => e.type === "marriage").length;
   const deathCount = events.filter((e) => e.type === "death").length;
+
+  const minYear = events.length > 0 ? Math.min(...events.map((e) => e.year).filter(Boolean)) : 0;
+  const maxYear = events.length > 0 ? Math.max(...events.map((e) => e.year).filter(Boolean)) : 0;
+  const yearSpan = maxYear && minYear ? maxYear - minYear : 0;
 
   const scrollToDecade = (decade: number) => {
     const el = document.getElementById(`decade-${decade}`);
@@ -165,22 +204,22 @@ export function TimelinePageClient({
           alignItems: "flex-start",
           flexWrap: "wrap",
           gap: 16,
-          marginBottom: 24,
+          marginBottom: 20,
         }}
       >
         <div>
           <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <CalendarDays className="w-6 h-6 text-[var(--accent-color)]" />
-            Timeline Peristiwa Keluarga
+            <BookOpen className="w-6 h-6 text-[var(--accent-color)]" />
+            Alur Kisah &amp; Timeline Keluarga
           </h1>
           <p className="page-subtitle">
             {selectedPersonName
-              ? `Garis waktu kronologis peristiwa kehidupan untuk ${selectedPersonName}`
-              : "Garis waktu kronologis sejarah kelahiran, pernikahan, dan peristiwa penting keluarga"}
+              ? `Jejak langkah dan kisah hidup kronologis ${selectedPersonName}`
+              : `Kisah perjalanan sejarah keluarga (${minYear || "?"} – ${maxYear || "?"}${yearSpan > 0 ? ` · Rentang ${yearSpan} tahun` : ""})`}
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Link
             href="/relationships/new"
             style={{
@@ -208,7 +247,7 @@ export function TimelinePageClient({
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: 12,
-          marginBottom: 24,
+          marginBottom: 20,
         }}
       >
         {[
@@ -218,7 +257,6 @@ export function TimelinePageClient({
             icon: CalendarDays,
             color: "#4f46e5",
             bg: "rgba(79, 70, 229, 0.08)",
-            border: "rgba(79, 70, 229, 0.2)",
             filter: "all" as const,
           },
           {
@@ -227,7 +265,6 @@ export function TimelinePageClient({
             icon: Sparkles,
             color: "#16a34a",
             bg: "rgba(22, 163, 74, 0.08)",
-            border: "rgba(22, 163, 74, 0.2)",
             filter: "birth" as const,
           },
           {
@@ -236,7 +273,6 @@ export function TimelinePageClient({
             icon: HeartHandshake,
             color: "#e11d48",
             bg: "rgba(225, 29, 72, 0.08)",
-            border: "rgba(225, 29, 72, 0.2)",
             filter: "marriage" as const,
           },
           {
@@ -245,7 +281,6 @@ export function TimelinePageClient({
             icon: Moon,
             color: "#64748b",
             bg: "rgba(100, 116, 139, 0.08)",
-            border: "rgba(100, 116, 139, 0.2)",
             filter: "death" as const,
           },
         ].map((s) => {
@@ -296,7 +331,7 @@ export function TimelinePageClient({
         })}
       </div>
 
-      {/* Control Bar: Filter and Search */}
+      {/* Control Bar: Filter, View Switcher & Search */}
       <div
         style={{
           background: "var(--surface)",
@@ -400,6 +435,76 @@ export function TimelinePageClient({
               </button>
             )}
           </div>
+
+          {/* View Mode & Sort Order Controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap" }}>
+            {/* View Mode Switcher */}
+            <div style={{ display: "flex", background: "var(--subtle)", padding: 2, borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+              <button
+                type="button"
+                onClick={() => setViewMode("story")}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: 12,
+                  fontWeight: viewMode === "story" ? 600 : 500,
+                  background: viewMode === "story" ? "var(--foreground)" : "transparent",
+                  color: viewMode === "story" ? "var(--surface)" : "var(--muted)",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Alur Kisah
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("decade")}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: 12,
+                  fontWeight: viewMode === "decade" ? 600 : 500,
+                  background: viewMode === "decade" ? "var(--foreground)" : "transparent",
+                  color: viewMode === "decade" ? "var(--surface)" : "var(--muted)",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                Dekade
+              </button>
+            </div>
+
+            {/* Sort Order Button */}
+            <button
+              type="button"
+              onClick={() => setSortOrder((o) => (o === "asc" ? "desc" : "asc"))}
+              title="Ubah urutan alur waktu"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "5px 10px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--foreground)",
+                cursor: "pointer",
+              }}
+            >
+              <ArrowDownUp className="w-3.5 h-3.5 text-amber-600" />
+              <span>{sortOrder === "asc" ? "Awal → Terkini" : "Terkini → Awal"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Event Type Filter Pills */}
@@ -436,8 +541,8 @@ export function TimelinePageClient({
         </div>
       </div>
 
-      {/* Fast Decade Quick-Navigator */}
-      {filteredDecadesArr.length > 1 && (
+      {/* Fast Decade Quick-Navigator (Only in Decade view) */}
+      {viewMode === "decade" && filteredDecadesArr.length > 1 && (
         <div
           style={{
             display: "flex",
@@ -478,7 +583,7 @@ export function TimelinePageClient({
       )}
 
       {/* Timeline Content */}
-      {filteredDecadesArr.length === 0 ? (
+      {filteredEvents.length === 0 ? (
         <div
           style={{
             textAlign: "center",
@@ -512,26 +617,293 @@ export function TimelinePageClient({
               ? "Coba ubah kata kunci pencarian atau reset filter kategori."
               : "Belum ada data tanggal lahir, tanggal wafat, atau tanggal pernikahan. Anda dapat mengisinya melalui form edit anggota atau tambah hubungan."}
           </p>
-          <div style={{ marginTop: 16 }}>
-            <Link
-              href="/people"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 14px",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border)",
-                fontSize: 13,
-                color: "var(--foreground)",
-                textDecoration: "none",
-              }}
-            >
-              Lihat Daftar Anggota
-            </Link>
+        </div>
+      ) : viewMode === "story" ? (
+        /* ================= MODE ALUR KISAH (STORYLINE MODE) ================= */
+        <div style={{ position: "relative", paddingLeft: 28, marginTop: 16 }}>
+          {/* Main vertical flow line */}
+          <div
+            style={{
+              position: "absolute",
+              left: 7,
+              top: 12,
+              bottom: 16,
+              width: 2,
+              background: "linear-gradient(to bottom, var(--accent-color), var(--border) 95%, transparent)",
+              opacity: 0.45,
+            }}
+          />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {filteredEvents.map((event, idx) => {
+              const config = EVENT_CONFIG[event.type] || EVENT_CONFIG.birth;
+              const Icon = config.icon;
+              const portraitUrl = event.personPortraitPath ? getMediaUrl(event.personPortraitPath) : null;
+              const relatedPortraitUrl = event.relatedPersonPortraitPath
+                ? getMediaUrl(event.relatedPersonPortraitPath)
+                : null;
+
+              // Calculate time interval from previous event
+              const prevEvent = idx > 0 ? filteredEvents[idx - 1] : null;
+              let yearsInterval: number | null = null;
+              if (prevEvent && event.year && prevEvent.year) {
+                yearsInterval = Math.abs(event.year - prevEvent.year);
+              }
+
+              return (
+                <div key={event.id}>
+                  {/* Story Interval Connector */}
+                  {yearsInterval !== null && yearsInterval > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        margin: "-6px 0 14px -28px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          background: "var(--surface)",
+                          border: "2px solid var(--accent-color)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginLeft: 0,
+                        }}
+                      >
+                        <Clock className="w-2.5 h-2.5 text-[var(--accent-color)]" />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "var(--muted)",
+                          background: "var(--subtle)",
+                          padding: "2px 8px",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--border)",
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {sortOrder === "asc"
+                          ? `⏳ Selang ${yearsInterval} tahun kemudian (${event.year})`
+                          : `⏳ Berselang ${yearsInterval} tahun sebelumnya (${event.year})`}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Story Event Node */}
+                  <div style={{ position: "relative", display: "flex", gap: 14, alignItems: "flex-start" }}>
+                    {/* Node Dot */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: -25,
+                        top: 16,
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: config.color,
+                        border: "2px solid var(--background)",
+                        boxShadow: `0 0 0 2px ${config.color}40`,
+                        flexShrink: 0,
+                      }}
+                    />
+
+                    {/* Story Narrative Card */}
+                    <div
+                      style={{
+                        flex: 1,
+                        background: "var(--surface)",
+                        border: `1px solid var(--border)`,
+                        borderLeft: `4px solid ${config.color}`,
+                        borderRadius: "var(--radius-xl, 14px)",
+                        padding: "16px 18px",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                      className="hover:shadow-md transition-shadow"
+                    >
+                      {/* Card Header */}
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          {/* Avatar */}
+                          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                            <div
+                              style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: "50%",
+                                overflow: "hidden",
+                                background: config.bg,
+                                border: `2px solid ${config.color}`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              {portraitUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={portraitUrl} alt={event.personName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              ) : (
+                                <Icon className="w-5 h-5" />
+                              )}
+                            </div>
+                            {/* Spouse avatar if marriage */}
+                            {(event.type === "marriage" || event.type === "divorce") && event.relatedPersonName && (
+                              <div
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: "50%",
+                                  overflow: "hidden",
+                                  background: config.bg,
+                                  border: `2px solid ${config.color}`,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  marginLeft: -14,
+                                  zIndex: 1,
+                                }}
+                              >
+                                {relatedPortraitUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={relatedPortraitUrl} alt={event.relatedPersonName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                ) : (
+                                  <User className="w-5 h-5 text-[var(--muted)]" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: config.color, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+                              {config.storyCategory} · {event.year}
+                            </div>
+                            <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--foreground)", margin: 0, lineHeight: 1.3 }}>
+                              {event.description}
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Category Badge */}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: config.color,
+                            background: config.badgeBg,
+                            padding: "3px 9px",
+                            borderRadius: "var(--radius-sm)",
+                            border: `1px solid ${config.border}`,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <Icon className="w-3 h-3" />
+                          {config.label}
+                        </span>
+                      </div>
+
+                      {/* Story Footer Meta */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          flexWrap: "wrap",
+                          fontSize: 12,
+                          color: "var(--muted)",
+                          paddingTop: 8,
+                          borderTop: "1px solid var(--border)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
+                            {event.dateDisplay}
+                          </span>
+
+                          {event.place && (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                              <MapPin className="w-3.5 h-3.5 text-[var(--muted)]" />
+                              {event.place}
+                            </span>
+                          )}
+
+                          {event.ageAtEvent !== null && event.ageAtEvent !== undefined && (
+                            <span
+                              style={{
+                                background: "var(--subtle)",
+                                padding: "2px 7px",
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 500,
+                                border: "1px solid var(--border)",
+                              }}
+                            >
+                              {event.type === "death"
+                                ? `Usia ${event.ageAtEvent} tahun saat wafat`
+                                : event.type === "marriage"
+                                ? `Usia ${event.ageAtEvent} tahun saat menikah`
+                                : `Usia ${event.ageAtEvent} tahun`}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Person Links */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Link
+                            href={`/people/${event.personId}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              color: "var(--accent-color)",
+                              textDecoration: "none",
+                              fontWeight: 600,
+                              fontSize: 12,
+                            }}
+                          >
+                            Profil {event.personName.split(" ")[0]}
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                          {event.relatedPersonId && (
+                            <Link
+                              href={`/people/${event.relatedPersonId}`}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                color: "var(--accent-color)",
+                                textDecoration: "none",
+                                fontWeight: 600,
+                                fontSize: 12,
+                              }}
+                            >
+                              Profil {event.relatedPersonName?.split(" ")[0]}
+                              <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (
+        /* ================= MODE LINIMASA DEKADE (DECADE VIEW) ================= */
         <div style={{ position: "relative", paddingLeft: 24, marginTop: 12 }}>
           {/* Main vertical line */}
           <div
@@ -558,7 +930,6 @@ export function TimelinePageClient({
                   position: "relative",
                 }}
               >
-                {/* Glowing decade dot */}
                 <div
                   style={{
                     position: "absolute",
@@ -645,12 +1016,11 @@ export function TimelinePageClient({
                           alignItems: "flex-start",
                           gap: 14,
                           boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-                          transition: "transform 150ms ease, box-shadow 150ms ease",
                         }}
                         className="hover:shadow-md transition-shadow"
                       >
-                        {/* Avatar / Portrait or Icon */}
-                        <div style={{ display: "flex", alignItems: "center", gap: -8, flexShrink: 0 }}>
+                        {/* Avatar */}
+                        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                           <div
                             style={{
                               width: 38,
@@ -666,17 +1036,12 @@ export function TimelinePageClient({
                           >
                             {portraitUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={portraitUrl}
-                                alt={event.personName}
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                              />
+                              <img src={portraitUrl} alt={event.personName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
                               <Icon className="w-4 h-4" />
                             )}
                           </div>
 
-                          {/* Second spouse portrait if marriage/divorce */}
                           {(event.type === "marriage" || event.type === "divorce") && event.relatedPersonName && (
                             <div
                               style={{
@@ -695,11 +1060,7 @@ export function TimelinePageClient({
                             >
                               {relatedPortraitUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={relatedPortraitUrl}
-                                  alt={event.relatedPersonName}
-                                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                />
+                                <img src={relatedPortraitUrl} alt={event.relatedPersonName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                               ) : (
                                 <User className="w-4 h-4 text-[var(--muted)]" />
                               )}
@@ -731,7 +1092,6 @@ export function TimelinePageClient({
                               {event.description}
                             </h4>
 
-                            {/* Event Type Badge */}
                             <span
                               style={{
                                 fontSize: 11,
@@ -751,7 +1111,6 @@ export function TimelinePageClient({
                             </span>
                           </div>
 
-                          {/* Event Meta Row */}
                           <div
                             style={{
                               display: "flex",
@@ -792,7 +1151,6 @@ export function TimelinePageClient({
                               </span>
                             )}
 
-                            {/* Links */}
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
                               <Link
                                 href={`/people/${event.personId}`}
@@ -841,4 +1199,3 @@ export function TimelinePageClient({
     </div>
   );
 }
-

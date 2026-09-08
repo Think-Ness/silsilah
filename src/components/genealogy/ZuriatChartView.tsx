@@ -819,24 +819,34 @@ export function ZuriatChartView({
             </div>
           </button>
 
-          {/* Ikon Ikatan Pernikahan */}
+          {/* Simbol Pernikahan */}
           <div
             style={{
-              background: "#FDE047",
-              color: "#854D0E",
               width: "36px",
               height: "36px",
               borderRadius: "50%",
+              background: "#FEF08A",
+              border: "2px solid #CA8A04",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "16px",
-              fontWeight: 800,
               boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
             }}
             title="Pernikahan Suami Istri"
           >
-            💍
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="#B45309"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="8.5" cy="12" r="5.5" />
+              <circle cx="15.5" cy="12" r="5.5" />
+            </svg>
           </div>
 
           {/* Pasangan */}

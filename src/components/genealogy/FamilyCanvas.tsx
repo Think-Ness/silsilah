@@ -20,6 +20,7 @@ import "@xyflow/react/dist/style.css";
 import { PersonNode } from "./PersonNode";
 import { UnionNode } from "./UnionNode";
 import { CanvasControls } from "./CanvasControls";
+import { EditUnionModal } from "./EditUnionModal";
 import { buildCanvasGraph } from "@/lib/genealogy/canvas";
 import { runElkLayout } from "@/lib/layout/elkLayout";
 import { updateChildOrder } from "@/lib/genealogy/relationships";
@@ -59,6 +60,8 @@ function CanvasInner({
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isLayoutRunning, setIsLayoutRunning] = useState(false);
+  const [selectedUnion, setSelectedUnion] = useState<Union | null>(null);
+  const [selectedUnionMembers, setSelectedUnionMembers] = useState<PersonWithPortrait[]>([]);
   const { fitView } = useReactFlow();
   const hasInitialFitRef = useRef(false);
 
@@ -256,14 +259,44 @@ function CanvasInner({
     return () => window.removeEventListener("silsilah:child-order-updated", handleOrderUpdated);
   }, [people, unions, unionMembers, parentChildRels]);
 
+  // Listener untuk membuka modal edit status pernikahan saat icon cincin di klik
+  useEffect(() => {
+    const handleEditUnionEvent = (e: any) => {
+      if (e.detail?.union) {
+        const unionData = e.detail.union as Union;
+        const memberIds = (e.detail.memberIds as string[]) || [];
+        const membersList = memberIds
+          .map((id) => people.find((p) => p.id === id))
+          .filter((p): p is PersonWithPortrait => !!p);
+
+        setSelectedUnion(unionData);
+        setSelectedUnionMembers(membersList);
+      }
+    };
+
+    window.addEventListener("silsilah:edit-union", handleEditUnionEvent);
+    return () => window.removeEventListener("silsilah:edit-union", handleEditUnionEvent);
+  }, [people]);
+
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       if (node.type === "personNode" && onPersonClick) {
         const personId = node.id.replace("person-", "");
         onPersonClick(personId);
+      } else if (node.type === "unionNode") {
+        const unionData = (node.data as any)?.union as Union | undefined;
+        const memberIds = ((node.data as any)?.memberIds as string[]) || [];
+        const membersList = memberIds
+          .map((id) => people.find((p) => p.id === id))
+          .filter((p): p is PersonWithPortrait => !!p);
+
+        if (unionData) {
+          setSelectedUnion(unionData);
+          setSelectedUnionMembers(membersList);
+        }
       }
     },
-    [onPersonClick]
+    [onPersonClick, people]
   );
 
   const handleAutoLayout = useCallback(() => {
@@ -375,6 +408,14 @@ function CanvasInner({
           onPrint={handlePrintCanvas}
         />
       </ReactFlow>
+
+      {/* Modal Edit Status & Detail Pernikahan */}
+      <EditUnionModal
+        open={!!selectedUnion}
+        union={selectedUnion}
+        members={selectedUnionMembers}
+        onClose={() => setSelectedUnion(null)}
+      />
     </div>
   );
 }
