@@ -119,19 +119,44 @@ export default async function RelationshipsPage() {
                         {union.relationship_type === "marriage" ? "Pernikahan" : union.relationship_type}
                       </td>
                       <td style={{ fontSize: "13px" }}>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            fontSize: "11px",
-                            fontWeight: 500,
-                            background: union.status === "active" ? "#DCFCE7" : "var(--subtle)",
-                            color: union.status === "active" ? "#166534" : "var(--muted)",
-                          }}
-                        >
-                          {union.status === "active" ? "Aktif" : union.status === "ended" ? "Berakhir" : union.status === "widowed" ? "Duda/Janda" : union.status === "divorced" ? "Cerai" : "—"}
-                        </span>
+                        {(() => {
+                          const p1Deceased = p1?.life_status === "deceased" || !!p1?.death_date;
+                          const p2Deceased = p2?.life_status === "deceased" || !!p2?.death_date;
+                          const isAutoWidowed = (p1Deceased || p2Deceased) && !(p1Deceased && p2Deceased);
+                          const isBothDeceased = p1Deceased && p2Deceased;
+
+                          let label = union.status === "active" ? "Aktif" : union.status === "ended" ? "Berakhir" : union.status === "divorced" ? "Cerai" : "—";
+                          let bg = union.status === "active" ? "#DCFCE7" : "var(--subtle)";
+                          let color = union.status === "active" ? "#166534" : "var(--muted)";
+
+                          if (union.status !== "divorced" && union.status !== "ended") {
+                            if (isAutoWidowed) {
+                              label = "Duda / Janda";
+                              bg = "#F3E8FF";
+                              color = "#7E22CE";
+                            } else if (isBothDeceased) {
+                              label = "Keduanya Wafat";
+                              bg = "var(--subtle)";
+                              color = "var(--muted)";
+                            }
+                          }
+
+                          return (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                                fontWeight: 500,
+                                background: bg,
+                                color: color,
+                              }}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td style={{ fontSize: "13px", color: "var(--muted)" }}>
                         {union.start_date || "—"}

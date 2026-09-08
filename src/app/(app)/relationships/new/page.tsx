@@ -276,13 +276,15 @@ export default function NewRelationshipPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Aktif</SelectItem>
-                        <SelectItem value="ended">Berakhir</SelectItem>
-                        <SelectItem value="widowed">Duda/Janda</SelectItem>
-                        <SelectItem value="divorced">Cerai</SelectItem>
+                        <SelectItem value="active">Aktif (Menikah)</SelectItem>
+                        <SelectItem value="divorced">Bercerai</SelectItem>
+                        <SelectItem value="ended">Berakhir / Pisah</SelectItem>
                         <SelectItem value="unknown">Tidak Diketahui</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      💡 Status <strong>Duda / Janda</strong> dideteksi otomatis berdasarkan status wafat pasangan.
+                    </p>
                   </div>
                 </div>
                 <div>

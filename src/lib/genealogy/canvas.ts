@@ -31,6 +31,7 @@ export interface PersonNodeData {
 export interface UnionNodeData {
   union: Union;
   memberIds: string[];
+  members?: PersonWithPortrait[];
   [key: string]: unknown;
 }
 
@@ -855,19 +856,20 @@ export function buildCanvasGraph(
         y: 0,
       };
 
+    const m1 = peopleMap.get(memberIds[0]);
+    const m2 = peopleMap.get(memberIds[1]);
+    const members = [m1, m2].filter((p): p is PersonWithPortrait => !!p);
+
     nodes.push({
       id: `union-${union.id}`,
       type: "unionNode",
       position: unionPos,
-      data: { union, memberIds } as UnionNodeData,
+      data: { union, memberIds, members } as UnionNodeData,
       width: UNION_NODE_SIZE,
       height: UNION_NODE_SIZE,
     });
 
     // Edge pernikahan: Suami (kanan) ke UnionNode (kiri), Istri (kiri) ke UnionNode (kanan)
-    const m1 = peopleMap.get(memberIds[0]);
-    const m2 = peopleMap.get(memberIds[1]);
-
     if (m1 && m2) {
       const husband = m1.gender === "male" || m2.gender === "female" ? m1 : m2;
       const wife = husband.id === m1.id ? m2 : m1;

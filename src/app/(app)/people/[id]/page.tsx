@@ -199,18 +199,32 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
           {profile.spouses.length > 0 && (
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "4px" }}>Pasangan</div>
-              {profile.spouses.map(({ person, union }) => (
-                <div key={person.id} style={{ fontSize: "14px", color: "var(--foreground)", marginBottom: "4px" }}>
-                  <Link href={`/people/${person.id}`} style={{ color: "var(--accent-color)", textDecoration: "none" }}>
-                    {getDisplayName(person)}
-                  </Link>
-                  <span style={{ fontSize: "12px", color: "var(--muted)", marginLeft: "6px" }}>
-                    ({union.relationship_type === "marriage" ? "Menikah" : union.relationship_type}
-                    {union.start_date ? ` sejak ${union.start_date}` : ""}
-                    {union.status === "ended" ? ", telah berakhir" : union.status === "widowed" ? ", duda/janda" : union.status === "divorced" ? ", cerai" : ""})
-                  </span>
-                </div>
-              ))}
+              {profile.spouses.map(({ person, union }) => {
+                const isSpouseDeceased = person.life_status === "deceased" || !!person.death_date;
+                const isSelfDeceased = profile.life_status === "deceased" || !!profile.death_date;
+                let statusText = union.relationship_type === "marriage" ? "Menikah" : union.relationship_type;
+                if (union.status === "divorced") {
+                  statusText = "Bercerai";
+                } else if (union.status === "ended") {
+                  statusText = "Telah Berakhir";
+                } else if (isSpouseDeceased && !isSelfDeceased) {
+                  statusText = profile.gender === "female" ? "Janda (Pasangan Wafat)" : "Duda (Pasangan Wafat)";
+                } else if (isSpouseDeceased && isSelfDeceased) {
+                  statusText = "Menikah (Keduanya Telah Wafat)";
+                }
+
+                return (
+                  <div key={person.id} style={{ fontSize: "14px", color: "var(--foreground)", marginBottom: "4px" }}>
+                    <Link href={`/people/${person.id}`} style={{ color: "var(--accent-color)", textDecoration: "none" }}>
+                      {getDisplayName(person)}
+                    </Link>
+                    <span style={{ fontSize: "12px", color: "var(--muted)", marginLeft: "6px" }}>
+                      ({statusText}
+                      {union.start_date ? ` · Sejak ${union.start_date}` : ""})
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
 

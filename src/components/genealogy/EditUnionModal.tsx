@@ -52,7 +52,9 @@ export function EditUnionModal({
   const p1Name = p1 ? [p1.prefix_title, p1.display_name || p1.full_name, p1.suffix_title].filter(Boolean).join(" ") : "Pasangan 1";
   const p2Name = p2 ? [p2.prefix_title, p2.display_name || p2.full_name, p2.suffix_title].filter(Boolean).join(" ") : "Pasangan 2";
   const p1Portrait = p1?.portrait ? getMediaUrl(p1.portrait.storage_path) : null;
-  const p2Portrait = p2?.portrait ? getMediaUrl(p2.portrait.storage_path) : null;
+  const p1Deceased = p1 ? (p1.life_status === "deceased" || !!p1.death_date) : false;
+  const p2Deceased = p2 ? (p2.life_status === "deceased" || !!p2.death_date) : false;
+  const isAutoWidowed = (p1Deceased || p2Deceased) && !(p1Deceased && p2Deceased);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,21 +217,32 @@ export function EditUnionModal({
             {/* Status Hubungan */}
             <div>
               <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                Status Saat Ini
+                Status Hubungan
               </label>
               <select
-                value={status}
+                value={status === "widowed" ? "active" : status}
                 onChange={(e) => setStatus(e.target.value as any)}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-[var(--border)] bg-[var(--surface)] focus:border-amber-500 outline-none"
               >
-                <option value="active">Menikah (Aktif)</option>
-                <option value="widowed">Duda / Janda (Salah satu wafat)</option>
+                <option value="active">Menikah (Pasangan)</option>
                 <option value="divorced">Bercerai</option>
                 <option value="ended">Berakhir</option>
-                <option value="unknown">Tidak Diketahui</option>
               </select>
             </div>
           </div>
+
+          {/* Auto Duda/Janda Notification */}
+          {isAutoWidowed && (
+            <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2">
+              <span className="text-sm">ℹ️</span>
+              <div>
+                <span className="font-bold">Status Duda / Janda Terdeteksi Otomatis:</span>
+                <p className="mt-0.5 opacity-90 leading-relaxed">
+                  Sistem otomatis mengenali status {p1Deceased ? `${p2Name} sebagai Duda/Janda karena ${p1Name}` : `${p1Name} sebagai Duda/Janda karena ${p2Name}`} telah tercatat wafat pada data profilnya.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Tanggal Pernikahan (Mulai) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-[var(--subtle)]/30 border border-[var(--border)]">

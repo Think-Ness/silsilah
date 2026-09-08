@@ -7,7 +7,7 @@ import type {
   UnionMember,
   ParentChildRelationship,
 } from "@/types/genealogy";
-import { User, Printer, Pencil, Check, ZoomIn, ZoomOut, Maximize2, RotateCcw } from "lucide-react";
+import { User, Printer, Pencil, Check, ZoomIn, ZoomOut, Maximize2, RotateCcw, HeartHandshake } from "lucide-react";
 
 interface ZuriatChartViewProps {
   people: PersonWithPortrait[];
@@ -825,8 +825,8 @@ export function ZuriatChartView({
               width: "36px",
               height: "36px",
               borderRadius: "50%",
-              background: "#FEF08A",
-              border: "2px solid #CA8A04",
+              background: "#FFF1F2",
+              border: "2px solid #E11D48",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -834,19 +834,7 @@ export function ZuriatChartView({
             }}
             title="Pernikahan Suami Istri"
           >
-            <svg
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="none"
-              stroke="#B45309"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="8.5" cy="12" r="5.5" />
-              <circle cx="15.5" cy="12" r="5.5" />
-            </svg>
+            <HeartHandshake className="w-5 h-5 text-rose-600" />
           </div>
 
           {/* Pasangan */}
