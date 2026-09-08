@@ -208,14 +208,23 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
 
                   // Tentukan status spesifik orang ini terhadap pasangannya
                   let personalStatusLabel = "Menikah";
+                  let dateLabel = "";
+
                   if (union.status === "divorced") {
-                    personalStatusLabel = "Bercerai";
+                    personalStatusLabel = profile.gender === "female" ? "Janda (Cerai Hidup)" : profile.gender === "male" ? "Duda (Cerai Hidup)" : "Bercerai";
+                    dateLabel = union.end_date ? ` · Cerai: ${union.end_date}` : union.start_date ? ` · Menikah: ${union.start_date}` : "";
                   } else if (union.status === "ended") {
                     personalStatusLabel = "Berakhir / Pisah";
+                    dateLabel = union.end_date ? ` · ${union.end_date}` : "";
                   } else if (isSpouseDeceased && !isSelfDeceased) {
                     personalStatusLabel = profile.gender === "female" ? "Janda (Suami Wafat)" : profile.gender === "male" ? "Duda (Istri Wafat)" : "Duda / Janda";
+                    dateLabel = person.death_date ? ` · Wafat: ${person.death_date}` : union.start_date ? ` · Menikah: ${union.start_date}` : "";
                   } else if (isSpouseDeceased && isSelfDeceased) {
                     personalStatusLabel = "Keduanya Telah Wafat (Rahimahumallah)";
+                    const deaths = [profile.death_date, person.death_date].filter(Boolean);
+                    dateLabel = deaths.length > 0 ? ` · Wafat: ${deaths.join(" & ")}` : "";
+                  } else {
+                    dateLabel = union.start_date ? ` · Menikah: ${union.start_date}` : "";
                   }
 
                   return (
@@ -229,13 +238,21 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <HeartHandshake className={`w-4 h-4 ${isSpouseDeceased ? "text-purple-600" : "text-rose-600"}`} />
-                          <Link href={`/people/${person.id}`} style={{ fontWeight: 600, color: "var(--accent-color)", textDecoration: "none" }}>
-                            {getDisplayName(person)}
-                          </Link>
-                          {person.life_status === "deceased" && (
-                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Alm.)</span>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <HeartHandshake className={`w-4 h-4 ${isSpouseDeceased ? "text-purple-600" : union.status === "divorced" ? "text-red-600" : "text-rose-600"}`} />
+                            <Link href={`/people/${person.id}`} style={{ fontWeight: 600, color: "var(--accent-color)", textDecoration: "none" }}>
+                              {getDisplayName(person)}
+                            </Link>
+                            {person.life_status === "deceased" && (
+                              <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Alm.)</span>
+                            )}
+                          </div>
+                          {/* Tanggal Pernikahan Tambahan jika ada tanggal wafat */}
+                          {isSpouseDeceased && !isSelfDeceased && union.start_date && person.death_date && (
+                            <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px", marginLeft: "24px" }}>
+                              Pernikahan: {union.start_date}
+                            </div>
                           )}
                         </div>
                         <span
@@ -249,7 +266,7 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
                           }}
                         >
                           {personalStatusLabel}
-                          {union.start_date ? ` · Sejak ${union.start_date}` : ""}
+                          {dateLabel}
                         </span>
                       </div>
 

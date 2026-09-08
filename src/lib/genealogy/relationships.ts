@@ -24,6 +24,10 @@ export interface UnionMortalityInfo {
   deceasedTitle?: string;
   doaText: string;
   shortDoa: string;
+  marriageDate?: string | null;
+  divorceDate?: string | null;
+  deathDate?: string | null;
+  dateSummary?: string;
 }
 
 /** Hitung status ikatan perkawinan dan doa berdasarkan vitalitas / wafatnya pasangan */
@@ -39,19 +43,40 @@ export function getUnionMortalityInfo(
   const isBothDeceased = p1Deceased && p2Deceased;
   const isOneDeceased = (p1Deceased || p2Deceased) && !isBothDeceased;
 
+  const marriageDate = union?.start_date || null;
+  const divorceDate = union?.end_date || null;
+
   if (isDivorced) {
+    const isEnded = union?.status === "ended";
+    const dateSummary = divorceDate
+      ? `Bercerai: ${divorceDate}${marriageDate ? ` (Menikah: ${marriageDate})` : ""}`
+      : marriageDate
+      ? `Menikah: ${marriageDate}`
+      : "";
+
     return {
       isDivorced: true,
       isBothDeceased,
       isOneDeceased,
-      statusLabel: union?.status === "ended" ? "Berakhir / Pisah" : "Bercerai",
+      statusLabel: isEnded ? "Berakhir / Pisah" : "Bercerai (Cerai Hidup)",
       statusBadgeColor: "red",
-      doaText: "Semoga silaturahmi dan kebaikan senantiasa terjaga.",
-      shortDoa: "",
+      doaText: "Semoga masing-masing pihak senantiasa diberikan kelapangan hati, ketenangan batin, serta keberkahan hidup.",
+      shortDoa: isEnded ? "Berakhir" : "Cerai Hidup",
+      marriageDate,
+      divorceDate,
+      deathDate: null,
+      dateSummary,
     };
   }
 
   if (isBothDeceased) {
+    const deathDates = [p1?.death_date, p2?.death_date].filter(Boolean);
+    const dateSummary = deathDates.length > 0
+      ? `Wafat: ${deathDates.join(" & ")}${marriageDate ? ` · Menikah: ${marriageDate}` : ""}`
+      : marriageDate
+      ? `Menikah: ${marriageDate}`
+      : "";
+
     return {
       isDivorced: false,
       isBothDeceased: true,
@@ -60,6 +85,10 @@ export function getUnionMortalityInfo(
       statusBadgeColor: "zinc",
       doaText: "Semoga Allah SWT merahmati, mengampuni dosa-dosa keduanya, meluaskan kuburnya, dan mempertemukan mereka kembali di surga Firdaus-Nya. Aamiin.",
       shortDoa: "Rahimahumallah",
+      marriageDate,
+      divorceDate: null,
+      deathDate: deathDates[0] || null,
+      dateSummary,
     };
   }
 
@@ -91,6 +120,16 @@ export function getUnionMortalityInfo(
       shortDoa = "Rahimahullah";
     }
 
+    const deathDate = deceased?.death_date || null;
+    let dateSummary = "";
+    if (deathDate && marriageDate) {
+      dateSummary = `Wafat: ${deathDate} · Menikah: ${marriageDate}`;
+    } else if (deathDate) {
+      dateSummary = `Wafat: ${deathDate}`;
+    } else if (marriageDate) {
+      dateSummary = `Menikah: ${marriageDate}`;
+    }
+
     const doaText = `Semoga ${deceasedTitle} (${deceasedName}) diampuni segala dosanya, diterima segala amal ibadahnya, serta ditempatkan di surga terbaik di sisi Allah SWT. Dan semoga ${survivorName} (${survivingTitle}) senantiasa diberi ketabahan, kekuatan, dan keberkahan hidup. Aamiin.`;
 
     return {
@@ -105,8 +144,14 @@ export function getUnionMortalityInfo(
       deceasedTitle,
       doaText,
       shortDoa,
+      marriageDate,
+      divorceDate: null,
+      deathDate,
+      dateSummary,
     };
   }
+
+  const dateSummary = marriageDate ? `Menikah: ${marriageDate}` : "";
 
   return {
     isDivorced: false,
@@ -116,6 +161,10 @@ export function getUnionMortalityInfo(
     statusBadgeColor: "rose",
     doaText: "Semoga senantiasa menjadi keluarga yang sakinah, mawaddah, warahmah, serta penuh keberkahan.",
     shortDoa: "Sakinah Mawaddah Warahmah",
+    marriageDate,
+    divorceDate: null,
+    deathDate: null,
+    dateSummary,
   };
 }
 

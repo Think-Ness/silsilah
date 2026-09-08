@@ -155,7 +155,10 @@ export default async function RelationshipsPage() {
                         })()}
                       </td>
                       <td style={{ fontSize: "13px", color: "var(--muted)" }}>
-                        {union.start_date || "—"}
+                        {(() => {
+                          const info = getUnionMortalityInfo([p1, p2], union);
+                          return info.dateSummary || union.start_date || "—";
+                        })()}
                       </td>
                     </tr>
                   );
