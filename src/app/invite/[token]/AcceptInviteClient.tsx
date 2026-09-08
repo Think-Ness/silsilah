@@ -45,7 +45,9 @@ export function AcceptInviteClient({ invitation, token, serverError }: AcceptInv
     setError(null);
 
     startTransition(async () => {
-      // Sign up with Supabase auth
+      let activeUser = null;
+
+      // 1. Sign up akun dengan Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -57,31 +59,37 @@ export function AcceptInviteClient({ invitation, token, serverError }: AcceptInv
         },
       });
 
+      if (authData?.user) {
+        activeUser = authData.user;
+      }
+
       if (signUpError) {
-        // Maybe user already exists — try signing in
+        // Jika akun sudah pernah dibuat sebelumnya, coba login
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) {
-          setError(signUpError.message);
+          setError(signUpError.message || signInError.message);
           return;
         }
-        if (!signInData.user) {
-          setError("Gagal masuk");
-          return;
+        if (signInData?.user) {
+          activeUser = signInData.user;
         }
       }
 
-      // Accept the invitation (update profile role)
-      const { error: acceptError } = await acceptInvitation(token);
+      // 2. Terima undangan (memperbarui role & konfirmasi akun lewat RPC/server)
+      const { error: acceptError } = await acceptInvitation(token, activeUser?.id, fullName);
       if (acceptError) {
         setError(acceptError);
         return;
       }
 
+      // 3. Pastikan user masuk dengan kredensial yang baru dibuat
+      await supabase.auth.signInWithPassword({ email, password });
+
       setStep("success");
       setTimeout(() => {
         router.push("/");
         router.refresh();
-      }, 2500);
+      }, 2000);
     });
   }
 

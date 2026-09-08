@@ -215,9 +215,32 @@ export async function getInvitationByToken(
 
 /** Mark invitation as accepted and update profile role */
 export async function acceptInvitation(
-  token: string
+  token: string,
+  userId?: string,
+  fullName?: string
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
+
+  // 1. Coba panggil RPC accept_user_invitation jika migrasi 011 sudah dijalankan
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("accept_user_invitation", {
+      p_token: token,
+      p_user_id: userId || null,
+      p_full_name: fullName || null,
+    });
+
+    if (!rpcError && rpcData) {
+      if (!rpcData.success) {
+        return { error: rpcData.error || "Undangan tidak valid" };
+      }
+      revalidatePath("/admin/users");
+      return { error: null };
+    }
+  } catch (rpcErr) {
+    console.warn("RPC accept_user_invitation failed or not installed, falling back to direct table update:", rpcErr);
+  }
+
+  // 2. Fallback jika RPC belum ada: update langsung tabel invitations & profiles
   const { data: inv, error: invError } = await supabase
     .from("invitations")
     .select("*")
@@ -230,27 +253,37 @@ export async function acceptInvitation(
     return { error: "Undangan tidak valid atau telah kadaluarsa" };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Silakan login terlebih dahulu" };
+  // Cari user id dari argumen atau session
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    targetUserId = user?.id;
+  }
 
-  // Mark invitation as accepted
+  if (!targetUserId) {
+    return { error: "Akun belum terdaftar atau silakan login terlebih dahulu" };
+  }
+
+  // Tandai undangan diterima
   await supabase
     .from("invitations")
     .update({ accepted_at: new Date().toISOString() })
     .eq("id", inv.id);
 
-  // Update profile role
+  // Perbarui atau buat profil dengan peran undangan
   await supabase
     .from("profiles")
     .upsert({
-      id: user.id,
+      id: targetUserId,
+      full_name: fullName || inv.email.split("@")[0],
       role: inv.role,
       is_active: true,
       updated_at: new Date().toISOString(),
     });
 
+  revalidatePath("/admin/users");
   return { error: null };
 }
 

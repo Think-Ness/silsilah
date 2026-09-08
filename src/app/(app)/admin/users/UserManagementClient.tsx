@@ -24,6 +24,10 @@ import {
   Trash2,
   ChevronDown,
   MoreVertical,
+  Share2,
+  ExternalLink,
+  Send,
+  Check,
 } from "lucide-react";
 
 interface UserManagementClientProps {
@@ -59,6 +63,11 @@ export function UserManagementClient({
 }: UserManagementClientProps) {
   const [activeTab, setActiveTab] = useState<"users" | "invitations">("users");
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [createdInviteModal, setCreatedInviteModal] = useState<{
+    email: string;
+    role: UserRole;
+    link: string;
+  } | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("family_member");
   const [inviteMessage, setInviteMessage] = useState("");
@@ -100,10 +109,16 @@ export function UserManagementClient({
       if (error) {
         showFeedback(error, true);
       } else if (invitation) {
-        showFeedback(`Undangan berhasil dibuat untuk ${inviteEmail}`);
+        const inviteLink = `${window.location.origin}/invite/${invitation.token}`;
+        setCreatedInviteModal({
+          email: invitation.email,
+          role: invitation.role,
+          link: inviteLink,
+        });
         setInviteEmail("");
         setInviteMessage("");
         setShowInviteForm(false);
+        setActiveTab("invitations");
       }
     });
   }
@@ -476,6 +491,27 @@ export function UserManagementClient({
       {/* Invitations Tab */}
       {activeTab === "invitations" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Banner Penjelasan Konsep Undangan */}
+          <div
+            style={{
+              padding: "14px 16px",
+              background: "rgba(59,130,246,0.06)",
+              border: "1px solid rgba(59,130,246,0.2)",
+              borderRadius: "var(--radius-md)",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+            }}
+          >
+            <Share2 size={18} color="#3b82f6" style={{ marginTop: 2, flexShrink: 0 }} />
+            <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--foreground)" }}>
+              <strong>Bagaimana Cara Mengundang Keluarga?</strong>
+              <div style={{ color: "var(--muted)", marginTop: 2, fontSize: 12 }}>
+                Sistem membuat <strong>Tautan Khusus</strong> untuk setiap undangan. Anda dapat langsung mengklik tombol <span style={{ color: "#25D366", fontWeight: 600 }}>WhatsApp</span> atau <strong>Salin Link</strong> pada daftar undangan di bawah ini dan mengirimkannya ke keluarga Anda. Saat membuka link, mereka cukup membuat kata sandi dan langsung otomatis aktif sebagai Anggota Keluarga tanpa perlu menunggu verifikasi email.
+              </div>
+            </div>
+          </div>
+
           {/* Pending */}
           {pendingInvitations.length > 0 && (
             <div>
@@ -746,6 +782,171 @@ export function UserManagementClient({
           </div>
         </div>
       )}
+
+      {/* Modal Tautan Undangan Berhasil Dibuat */}
+      {createdInviteModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: 24,
+              maxWidth: 480,
+              width: "100%",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: "50%",
+                  background: "rgba(34,197,94,0.12)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 12px",
+                  color: "#16a34a",
+                }}
+              >
+                <CheckCircle size={26} />
+              </div>
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px", color: "var(--foreground)" }}>
+                Tautan Undangan Siap Dibagikan!
+              </h3>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+                Undangan untuk <strong>{createdInviteModal.email}</strong> ({ROLE_LABELS[createdInviteModal.role]})
+              </p>
+            </div>
+
+            <div
+              style={{
+                background: "var(--subtle)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                padding: "10px 12px",
+                marginBottom: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <input
+                readOnly
+                value={createdInviteModal.link}
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  border: "none",
+                  fontSize: 12,
+                  color: "var(--foreground)",
+                  fontFamily: "monospace",
+                  outline: "none",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(createdInviteModal.link);
+                  setCopiedToken("modal");
+                  setTimeout(() => setCopiedToken(null), 2000);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "6px 12px",
+                  background: copiedToken === "modal" ? "#22c55e" : "var(--foreground)",
+                  color: "var(--surface)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                {copiedToken === "modal" ? <Check size={13} /> : <Copy size={13} />}
+                <span>{copiedToken === "modal" ? "Tersalin!" : "Salin Link"}</span>
+              </button>
+            </div>
+
+            {/* Tombol Bagikan WhatsApp */}
+            <a
+              href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                `Halo! Anda diundang bergabung ke Silsilah Keluarga sebagai ${ROLE_LABELS[createdInviteModal.role]}. Silakan klik tautan berikut untuk membuat kata sandi dan mengakses bagan silsilah keluarga:\n\n${createdInviteModal.link}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "11px 16px",
+                background: "#25D366",
+                color: "#fff",
+                borderRadius: "var(--radius-md)",
+                textDecoration: "none",
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 14,
+                boxShadow: "0 2px 8px rgba(37,211,102,0.25)",
+              }}
+            >
+              <Share2 size={16} />
+              <span>Bagikan via WhatsApp</span>
+            </a>
+
+            <div
+              style={{
+                padding: "10px 12px",
+                background: "rgba(59,130,246,0.08)",
+                border: "1px solid rgba(59,130,246,0.2)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 12,
+                color: "var(--foreground)",
+                lineHeight: 1.5,
+                marginBottom: 16,
+              }}
+            >
+              💡 <strong>Cara Kerja:</strong> Karena server pengiriman email otomatis (SMTP) di Supabase belum disetel, Anda dapat langsung mengirimkan tautan ini via WhatsApp atau email pribadi. Penerima cukup membuka link ini untuk membuat kata sandi &amp; langsung masuk!
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCreatedInviteModal(null)}
+              style={{
+                width: "100%",
+                padding: "9px",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--muted)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -850,6 +1051,30 @@ function InvitationCard({
       {/* Actions */}
       {status === "pending" && (
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {/* WhatsApp share */}
+          <a
+            href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+              `Halo! Anda diundang bergabung ke Silsilah Keluarga sebagai ${roleLabels[invitation.role]}. Silakan klik tautan berikut untuk membuat akun:\n\n${typeof window !== "undefined" ? window.location.origin : ""}/invite/${invitation.token}`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Bagikan via WhatsApp"
+            style={{
+              width: 30,
+              height: 30,
+              border: "1px solid rgba(37,211,102,0.3)",
+              borderRadius: "var(--radius-sm)",
+              background: "rgba(37,211,102,0.1)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#25D366",
+              textDecoration: "none",
+            }}
+          >
+            <Share2 size={13} />
+          </a>
           <button
             id={`copy-invite-${invitation.id}`}
             onClick={() => onCopy(invitation.token)}
@@ -867,7 +1092,7 @@ function InvitationCard({
               color: copiedToken === invitation.token ? "#22c55e" : "var(--muted)",
             }}
           >
-            <Copy size={13} />
+            {copiedToken === invitation.token ? <Check size={13} /> : <Copy size={13} />}
           </button>
           <button
             id={`revoke-invite-${invitation.id}`}
