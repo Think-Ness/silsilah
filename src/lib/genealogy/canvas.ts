@@ -866,15 +866,25 @@ export function buildCanvasGraph(
       height: UNION_NODE_SIZE,
     });
 
-    // Edge pernikahan: Suami (kanan) ke UnionNode (kiri), Istri (kiri) ke UnionNode (kanan)
+    // Edge pernikahan: Orang di sebelah kiri -> titik kanan ke union (titik kiri),
+    // Orang di sebelah kanan -> titik kiri ke union (titik kanan)
     if (m1 && m2) {
-      const husband = m1.gender === "male" || m2.gender === "female" ? m1 : m2;
-      const wife = husband.id === m1.id ? m2 : m1;
+      const pos1 =
+        customPositions?.get(`person-${m1.id}`) ||
+        computedPositions.get(`person-${m1.id}`) ||
+        { x: 0, y: 0 };
+      const pos2 =
+        customPositions?.get(`person-${m2.id}`) ||
+        computedPositions.get(`person-${m2.id}`) ||
+        { x: 0, y: 0 };
 
-      // Garis pernikahan Suami (titik kanan) -> UnionNode (titik kiri)
+      const leftPerson = pos1.x <= pos2.x ? m1 : m2;
+      const rightPerson = pos1.x <= pos2.x ? m2 : m1;
+
+      // Garis pernikahan Orang Kiri (titik kanan) -> UnionNode (titik kiri)
       edges.push({
-        id: `spouse-edge-${union.id}-${husband.id}`,
-        source: `person-${husband.id}`,
+        id: `spouse-edge-${union.id}-${leftPerson.id}`,
+        source: `person-${leftPerson.id}`,
         sourceHandle: "right",
         target: `union-${union.id}`,
         targetHandle: "left",
@@ -883,10 +893,10 @@ export function buildCanvasGraph(
         style: { stroke: "#D97706", strokeWidth: 2 },
       });
 
-      // Garis pernikahan Istri (titik kiri) -> UnionNode (titik kanan)
+      // Garis pernikahan Orang Kanan (titik kiri) -> UnionNode (titik kanan)
       edges.push({
-        id: `spouse-edge-${union.id}-${wife.id}`,
-        source: `person-${wife.id}`,
+        id: `spouse-edge-${union.id}-${rightPerson.id}`,
+        source: `person-${rightPerson.id}`,
         sourceHandle: "left",
         target: `union-${union.id}`,
         targetHandle: "right",

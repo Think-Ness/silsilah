@@ -225,11 +225,21 @@ function CanvasInner({
             }
           }
         }
+        // Perbarui edges agar selalu presisi menghubungkan sisi kanan/kiri terdekat
+        const customPosMap = new Map<string, { x: number; y: number }>(Object.entries(posMap));
+        const { edges: updatedEdges } = buildCanvasGraph(
+          people,
+          unions,
+          unionMembers,
+          parentChildRels,
+          customPosMap
+        );
+        setEdges(updatedEdges);
       } catch (e) {
         console.warn("Gagal menyimpan posisi custom node:", e);
       }
     },
-    [parentChildRels]
+    [parentChildRels, people, unions, unionMembers]
   );
 
   // Listener saat urutan anak diperbarui dari modal dialog
