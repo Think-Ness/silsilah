@@ -19,6 +19,8 @@ import "@xyflow/react/dist/style.css";
 
 import { PersonNode } from "./PersonNode";
 import { UnionNode } from "./UnionNode";
+import { SmartMarriageEdge } from "./edges/SmartMarriageEdge";
+import { SmartParentChildEdge } from "./edges/SmartParentChildEdge";
 import { CanvasControls } from "./CanvasControls";
 import { EditUnionModal } from "./EditUnionModal";
 import { buildCanvasGraph } from "@/lib/genealogy/canvas";
@@ -34,6 +36,11 @@ import type {
 const nodeTypes = {
   personNode: PersonNode,
   unionNode: UnionNode,
+};
+
+const edgeTypes = {
+  smartMarriage: SmartMarriageEdge,
+  smartParentChild: SmartParentChildEdge,
 };
 
 interface FamilyCanvasProps {
@@ -377,6 +384,7 @@ function CanvasInner({
         onNodeClick={onNodeClick}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         minZoom={0.08}
         maxZoom={2.5}
         zoomOnScroll={true}

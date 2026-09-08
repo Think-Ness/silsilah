@@ -95,7 +95,15 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
       className="hover:scale-125 hover:shadow-lg group active:cursor-grabbing"
       title={tooltipText}
     >
-      {/* Handle dari Suami (kiri) */}
+      {/* Handle ke Leluhur / Atas */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top"
+        style={{ width: 6, height: 6, background: borderColor, border: "none" }}
+      />
+
+      {/* Handle dari Suami / Sisi Kiri */}
       <Handle
         type="target"
         position={Position.Left}
@@ -106,7 +114,7 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
       {/* HeartHandshake Icon */}
       <HeartHandshake className={`w-4 h-4 transition-transform group-hover:scale-110 ${iconColor}`} />
 
-      {/* Handle ke Istri (kanan) */}
+      {/* Handle ke Istri / Sisi Kanan */}
       <Handle
         type="target"
         position={Position.Right}
@@ -114,7 +122,7 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
         style={{ width: 6, height: 6, background: borderColor, border: "none" }}
       />
 
-      {/* Handle ke Anak-anak (bawah) */}
+      {/* Handle ke Anak-anak / Sisi Bawah */}
       <Handle
         type="source"
         position={Position.Bottom}

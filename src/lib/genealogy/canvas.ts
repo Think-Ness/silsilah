@@ -866,7 +866,7 @@ export function buildCanvasGraph(
       height: UNION_NODE_SIZE,
     });
 
-    // Edge pernikahan: Suami (kanan) ke UnionNode (kiri), Istri (kiri) ke UnionNode (kanan)
+    // Edge pernikahan cerdas: Suami <-> UnionNode <-> Istri
     if (m1 && m2) {
       const husband = m1.gender === "male" || m2.gender === "female" ? m1 : m2;
       const wife = husband.id === m1.id ? m2 : m1;
@@ -875,10 +875,8 @@ export function buildCanvasGraph(
       edges.push({
         id: `spouse-edge-${union.id}-${husband.id}`,
         source: `person-${husband.id}`,
-        sourceHandle: "right",
         target: `union-${union.id}`,
-        targetHandle: "left",
-        type: "smoothstep",
+        type: "smartMarriage",
         animated: false,
         style: { stroke: "#D97706", strokeWidth: 2 },
       });
@@ -887,10 +885,8 @@ export function buildCanvasGraph(
       edges.push({
         id: `spouse-edge-${union.id}-${wife.id}`,
         source: `person-${wife.id}`,
-        sourceHandle: "left",
         target: `union-${union.id}`,
-        targetHandle: "right",
-        type: "smoothstep",
+        type: "smartMarriage",
         animated: false,
         style: { stroke: "#D97706", strokeWidth: 2 },
       });
@@ -958,22 +954,9 @@ export function buildCanvasGraph(
       edges.push({
         id: `pcr-union-${targetUnionId}-${childId}`,
         source: `union-${targetUnionId}`,
-        sourceHandle: "bottom",
         target: `person-${childId}`,
-        targetHandle: "top",
-        type: "smoothstep",
+        type: "smartParentChild",
         label: edgeLabel,
-        labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
-        labelBgStyle: edgeLabel
-          ? {
-              fill: "#FFFFFF",
-              stroke: "#E5E7EB",
-              strokeWidth: 1,
-              rx: 4,
-              ry: 4,
-            }
-          : undefined,
-        labelBgPadding: edgeLabel ? [3, 5] : undefined,
         style: edgeStyle,
       });
       continue;
@@ -984,22 +967,9 @@ export function buildCanvasGraph(
       edges.push({
         id: `pcr-${rel.id}`,
         source: `person-${rel.parent_id}`,
-        sourceHandle: "bottom",
         target: `person-${rel.child_id}`,
-        targetHandle: "top",
-        type: "smoothstep",
+        type: "smartParentChild",
         label: edgeLabel,
-        labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
-        labelBgStyle: edgeLabel
-          ? {
-              fill: "#FFFFFF",
-              stroke: "#E5E7EB",
-              strokeWidth: 1,
-              rx: 4,
-              ry: 4,
-            }
-          : undefined,
-        labelBgPadding: edgeLabel ? [3, 5] : undefined,
         style: edgeStyle,
       });
     }
