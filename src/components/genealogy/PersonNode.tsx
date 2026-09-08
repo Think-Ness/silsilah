@@ -116,7 +116,7 @@ export const PersonNode = memo(function PersonNode({
           bg: "#FEF3C7",
           color: "#92400E",
           border: "#FCD34D",
-          label: roleLabel || "Kepala Zuriat",
+          label: roleLabel || "Kepala Zuriat (POV)",
         };
       case "root_spouse":
         return {
@@ -125,6 +125,41 @@ export const PersonNode = memo(function PersonNode({
           border: "#FDE047",
           label: roleLabel || "Pasangan Utama",
         };
+      case "parent":
+        return {
+          bg: "#EFF6FF",
+          color: "#1E40AF",
+          border: "#BFDBFE",
+          label: roleLabel || "Orang Tua",
+        };
+      case "grandparent":
+        return {
+          bg: "#EEF2FF",
+          color: "#3730A3",
+          border: "#C7D2FE",
+          label: roleLabel || "Kakek / Nenek",
+        };
+      case "great_grandparent":
+        return {
+          bg: "#F5F3FF",
+          color: "#5B21B6",
+          border: "#DDD6FE",
+          label: roleLabel || "Buyut",
+        };
+      case "ancestor":
+        return {
+          bg: "#F8FAFC",
+          color: "#334155",
+          border: "#CBD5E1",
+          label: roleLabel || "Moyang / Leluhur",
+        };
+      case "sibling":
+        return {
+          bg: "#F0F9FF",
+          color: "#0369A1",
+          border: "#BAE6FD",
+          label: data.childOrderLabel ? `${roleLabel} (${data.childOrderLabel})` : roleLabel || "Saudara Kandung",
+        };
       case "child":
         return {
           bg: "#D1FAE5",
@@ -132,11 +167,18 @@ export const PersonNode = memo(function PersonNode({
           border: "#6EE7B7",
           label: data.childOrderLabel || roleLabel || "Anak Kandung",
         };
+      case "nephew_niece":
+        return {
+          bg: "#CCFBF1",
+          color: "#115E59",
+          border: "#99F6E4",
+          label: roleLabel || "Keponakan",
+        };
       case "in_law":
         return {
-          bg: "#EDE9FE",
-          color: "#5B21B6",
-          border: "#C4B5FD",
+          bg: "#FCE7F3",
+          color: "#9D174D",
+          border: "#FBCFE8",
           label: roleLabel || "Menantu",
         };
       case "grandchild":
@@ -148,17 +190,10 @@ export const PersonNode = memo(function PersonNode({
         };
       case "great_grandchild":
         return {
-          bg: "#E0E7FF",
-          color: "#3730A3",
-          border: "#A5B4FC",
+          bg: "#EDE9FE",
+          color: "#5B21B6",
+          border: "#C4B5FD",
           label: roleLabel || "Cicit",
-        };
-      case "ancestor":
-        return {
-          bg: "#F1F5F9",
-          color: "#334155",
-          border: "#CBD5E1",
-          label: roleLabel || "Leluhur / Moyang",
         };
       default:
         return {

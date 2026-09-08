@@ -15,7 +15,20 @@ import type {
 export interface PersonNodeData {
   person: PersonWithPortrait;
   spouses: PersonWithPortrait[];
-  lineageRole: "root" | "root_spouse" | "ancestor" | "child" | "in_law" | "grandchild" | "great_grandchild" | "descendant";
+  lineageRole:
+    | "root"
+    | "root_spouse"
+    | "parent"
+    | "grandparent"
+    | "great_grandparent"
+    | "ancestor"
+    | "sibling"
+    | "child"
+    | "in_law"
+    | "grandchild"
+    | "great_grandchild"
+    | "nephew_niece"
+    | "descendant";
   roleLabel: string;
   parentsNames?: string[];
   generation: number;
@@ -339,8 +352,9 @@ export function calculateFamilyTreePositions(
     return count;
   }
 
-  // 4. Identifikasi Focal Couple / Zuriat Center
+  // 4. Identifikasi Focal Couple & Topmost Ancestor Unit untuk POV Canvas
   let focalUnit: FamilyUnit | null = null;
+  let startRootUnit: FamilyUnit | null = null;
 
   if (rootPersonId) {
     focalUnit =
@@ -349,6 +363,30 @@ export function calculateFamilyTreePositions(
           u.primaryPerson.id === rootPersonId ||
           u.spouses.some((s) => s.spouse.id === rootPersonId)
       ) || null;
+
+    // Cari leluhur tertinggi dari rootPersonId untuk menjadi titik awal penataan pohon POV
+    let curPId: string | undefined = rootPersonId;
+    let curUnit = focalUnit;
+    const seenAncestors = new Set<string>();
+
+    while (curPId && !seenAncestors.has(curPId)) {
+      seenAncestors.add(curPId);
+      const parentIds = childToParents.get(curPId) || [];
+      if (parentIds.length > 0) {
+        const pUnit = familyUnits.find(
+          (u) =>
+            u.primaryPerson.id === parentIds[0] ||
+            u.spouses.some((s) => s.spouse.id === parentIds[0])
+        );
+        if (pUnit) {
+          curUnit = pUnit;
+          curPId = pUnit.primaryPerson.id;
+          continue;
+        }
+      }
+      break;
+    }
+    startRootUnit = curUnit || focalUnit;
   }
 
   if (!focalUnit) {
@@ -365,6 +403,8 @@ export function calculateFamilyTreePositions(
   if (!focalUnit && familyUnits.length > 0) {
     focalUnit = familyUnits[0];
   }
+
+  const primaryStartUnit = startRootUnit || focalUnit;
 
   // 5. Hitung lebar subtree secara rekursif (Bottom-Up)
   function computeSubtreeWidth(unit: FamilyUnit, visited = new Set<string>()): number {
@@ -474,12 +514,12 @@ export function calculateFamilyTreePositions(
 
   const visitedUnits = new Set<string>();
 
-  if (focalUnit) {
-    const focalStartY = GENERATION_HEIGHT;
-    const focalStartX = 0;
+  if (primaryStartUnit) {
+    const startY = GENERATION_HEIGHT;
+    const startX = 0;
 
-    // Posisikan focal unit dan seluruh keturunannya
-    assignCoordinates(focalUnit, focalStartX, focalStartY, visitedUnits);
+    // Posisikan root lineage unit dan seluruh cabangnya
+    assignCoordinates(primaryStartUnit, startX, startY, visitedUnits);
   }
 
   // 7. Posisikan Orang Tua / Leluhur & Besan (Anti Tabrakan dengan Gap Luas)
@@ -663,32 +703,98 @@ export function buildCanvasGraph(
     }
   }
 
-  // Cari orang tua dari focal person dan pasangan (Leluhur)
-  const focalAncestorIds = new Set<string>();
+  // Map peran & generasi relatif terhadap focal person
+  const relativeRoleMap = new Map<
+    string,
+    { role: PersonNodeData["lineageRole"]; label: string; depth: number }
+  >();
+
   if (focalPersonId) {
-    for (const pId of childToParentsMap.get(focalPersonId) || []) {
-      focalAncestorIds.add(pId);
-    }
+    // 1. Focal Person (Tokoh Utama POV)
+    relativeRoleMap.set(focalPersonId, {
+      role: "root",
+      label: rootPersonId ? "Tokoh Utama (POV)" : "Kepala Zuriat",
+      depth: 0,
+    });
+
+    // 2. Pasangan Focal Person
     for (const spId of focalSpouseIds) {
-      for (const pId of childToParentsMap.get(spId) || []) {
-        focalAncestorIds.add(pId);
+      const sp = peopleMap.get(spId);
+      relativeRoleMap.set(spId, {
+        role: "root_spouse",
+        label: sp?.gender === "female" ? "Istri / Pasangan" : "Suami / Pasangan",
+        depth: 0,
+      });
+    }
+
+    // 3. Telusuri Leluhur ke atas secara rekursif (Orang Tua, Kakek/Nenek, Buyut, Moyang)
+    const ancestorQueue: { id: string; depth: number }[] = [{ id: focalPersonId, depth: 0 }];
+    const visitedAncestors = new Set<string>([focalPersonId]);
+
+    while (ancestorQueue.length > 0) {
+      const { id, depth } = ancestorQueue.shift()!;
+      const parentIds = childToParentsMap.get(id) || [];
+      const parentDepth = depth - 1;
+
+      for (const pId of parentIds) {
+        if (!visitedAncestors.has(pId)) {
+          visitedAncestors.add(pId);
+          const p = peopleMap.get(pId);
+          let role: PersonNodeData["lineageRole"] = "ancestor";
+          let label = "Leluhur";
+
+          if (parentDepth === -1) {
+            role = "parent";
+            label = p?.gender === "female" ? "Ibu Kandung" : "Ayah Kandung";
+          } else if (parentDepth === -2) {
+            role = "grandparent";
+            label = p?.gender === "female" ? "Nenek" : "Kakek";
+          } else if (parentDepth === -3) {
+            role = "great_grandparent";
+            label = "Buyut";
+          } else {
+            role = "ancestor";
+            label = "Moyang";
+          }
+
+          relativeRoleMap.set(pId, { role, label, depth: parentDepth });
+          ancestorQueue.push({ id: pId, depth: parentDepth });
+        }
       }
     }
-  }
 
-  // Hitung kedalaman generasi dari focal person
-  const personGenerationFromFocal = new Map<string, number>();
-  if (focalPersonId) {
-    personGenerationFromFocal.set(focalPersonId, 0);
-    for (const spId of focalSpouseIds) {
-      personGenerationFromFocal.set(spId, 0);
-    }
-    for (const ancId of focalAncestorIds) {
-      personGenerationFromFocal.set(ancId, -1);
+    // 4. Saudara Kandung dari Focal Person (Kakak / Adik Laki-laki / Perempuan)
+    const directParents = childToParentsMap.get(focalPersonId) || [];
+    const focalPersonObj = peopleMap.get(focalPersonId);
+
+    for (const parentId of directParents) {
+      const siblingIds = parentToChildrenMap.get(parentId) || [];
+      for (const sId of siblingIds) {
+        if (sId !== focalPersonId && !focalSpouseIds.has(sId) && !relativeRoleMap.has(sId)) {
+          const sPerson = peopleMap.get(sId);
+          let label = sPerson?.gender === "female" ? "Saudara Perempuan" : "Saudara Laki-laki";
+
+          if (focalPersonObj?.birth_date && sPerson?.birth_date) {
+            if (sPerson.birth_date < focalPersonObj.birth_date) {
+              label = sPerson.gender === "female" ? "Kakak Perempuan" : "Kakak Laki-laki";
+            } else if (sPerson.birth_date > focalPersonObj.birth_date) {
+              label = sPerson.gender === "female" ? "Adik Perempuan" : "Adik Laki-laki";
+            }
+          }
+
+          relativeRoleMap.set(sId, {
+            role: "sibling",
+            label,
+            depth: 0,
+          });
+        }
+      }
     }
 
-    // BFS ke bawah
-    const queue: { id: string; depth: number }[] = [];
+    // 5. Keturunan ke bawah (Anak, Cucu, Cicit, Keponakan)
+    const descQueue: { id: string; depth: number; isDirectLine: boolean }[] = [];
+
+    // Anak-anak langsung dari focal person & pasangan
     const focalChildren = new Set<string>();
     for (const c of parentToChildrenMap.get(focalPersonId) || []) focalChildren.add(c);
     for (const spId of focalSpouseIds) {
@@ -696,17 +802,56 @@ export function buildCanvasGraph(
     }
 
     for (const cId of focalChildren) {
-      queue.push({ id: cId, depth: 1 });
-      personGenerationFromFocal.set(cId, 1);
+      descQueue.push({ id: cId, depth: 1, isDirectLine: true });
+      const bio = childBiologicalStatusMap.get(cId);
+      const bioLabel = bio === "adoptive" ? "Anak Adopsi" : bio === "step" ? "Anak Tiri" : "Anak Kandung";
+      relativeRoleMap.set(cId, {
+        role: "child",
+        label: bioLabel,
+        depth: 1,
+      });
     }
 
-    while (queue.length > 0) {
-      const { id, depth } = queue.shift()!;
+    // Keponakan (Anak dari Saudara Kandung)
+    for (const [id, info] of relativeRoleMap.entries()) {
+      if (info.role === "sibling") {
+        const sibChildren = parentToChildrenMap.get(id) || [];
+        for (const scId of sibChildren) {
+          if (!relativeRoleMap.has(scId)) {
+            descQueue.push({ id: scId, depth: 1, isDirectLine: false });
+            relativeRoleMap.set(scId, {
+              role: "nephew_niece",
+              label: "Keponakan",
+              depth: 1,
+            });
+          }
+        }
+      }
+    }
+
+    // BFS ke bawah (Cucu, Cicit, Keturunan)
+    while (descQueue.length > 0) {
+      const { id, depth, isDirectLine } = descQueue.shift()!;
       const nextChildren = parentToChildrenMap.get(id) || [];
+
       for (const nc of nextChildren) {
-        if (!personGenerationFromFocal.has(nc)) {
-          personGenerationFromFocal.set(nc, depth + 1);
-          queue.push({ id: nc, depth: depth + 1 });
+        if (!relativeRoleMap.has(nc)) {
+          const nextDepth = depth + 1;
+          let role: PersonNodeData["lineageRole"] = "descendant";
+          let label = "Keturunan";
+
+          if (isDirectLine) {
+            if (nextDepth === 2) {
+              role = "grandchild";
+              label = "Cucu";
+            } else if (nextDepth === 3) {
+              role = "great_grandchild";
+              label = "Cicit";
+            }
+          }
+
+          relativeRoleMap.set(nc, { role, label, depth: nextDepth });
+          descQueue.push({ id: nc, depth: nextDepth, isDirectLine });
         }
       }
     }
@@ -745,38 +890,21 @@ export function buildCanvasGraph(
       .map((p) => p.display_name || p.full_name)
       .filter(Boolean) as string[];
 
-    // Tentukan lineageRole dan roleLabel
-    const depth = personGenerationFromFocal.get(person.id);
-    let lineageRole: PersonNodeData["lineageRole"] = "descendant";
-    let roleLabel = "Anggota Keluarga";
+    // Tentukan lineageRole dan roleLabel dari relativeRoleMap
+    const relInfo = relativeRoleMap.get(person.id);
+    let lineageRole: PersonNodeData["lineageRole"] = relInfo?.role || "descendant";
+    let roleLabel = relInfo?.label || "Anggota Keluarga";
+    const depth = relInfo?.depth ?? 0;
 
-    if (person.id === focalPersonId) {
-      lineageRole = "root";
-      roleLabel = person.gender === "female" ? "Kepala Zuriat" : "Kepala Zuriat";
-    } else if (focalSpouseIds.has(person.id)) {
-      lineageRole = "root_spouse";
-      roleLabel = person.gender === "female" ? "Istri / Pasangan Utama" : "Suami / Pasangan Utama";
-    } else if (focalAncestorIds.has(person.id)) {
-      lineageRole = "ancestor";
-      roleLabel = "Leluhur / Moyang";
-    } else if (depth === 1) {
-      lineageRole = "child";
-      const bio = childBiologicalStatusMap.get(person.id);
-      roleLabel = bio === "adoptive" ? "Anak Adopsi" : bio === "step" ? "Anak Tiri" : "Anak Kandung";
-    } else if (depth === 2) {
-      lineageRole = "grandchild";
-      roleLabel = "Cucu";
-    } else if (depth === 3) {
-      lineageRole = "great_grandchild";
-      roleLabel = "Cicit";
-    } else if (depth != null && depth > 3) {
-      lineageRole = "descendant";
-      roleLabel = "Keturunan";
-    } else {
-      // Tidak punya hubungan orang tua di tree, tapi menikah dengan keturunan?
+    if (!relInfo) {
+      // Fallback jika tidak terpetakan dalam relativeRoleMap
       const isMarriedToDescendant = Array.from(spouseIds).some((sId) => {
-        const sDepth = personGenerationFromFocal.get(sId);
-        return sDepth != null && sDepth >= 1;
+        const sInfo = relativeRoleMap.get(sId);
+        return (
+          sInfo?.role === "child" ||
+          sInfo?.role === "grandchild" ||
+          sInfo?.role === "great_grandchild"
+        );
       });
 
       if (isMarriedToDescendant) {
