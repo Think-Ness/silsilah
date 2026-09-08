@@ -42,12 +42,15 @@ const SIBLING_GAP = 90;
 const GENERATION_HEIGHT = 280;
 const UNION_NODE_SIZE = 28;
 
+interface SpouseUnitInfo {
+  spouse: PersonWithPortrait;
+  union: Union;
+}
+
 interface FamilyUnit {
-  id: string; // union.id atau person.id
-  type: "couple" | "single";
-  personA: PersonWithPortrait; // suami/anggota 1
-  personB?: PersonWithPortrait; // istri/anggota 2 (jika couple)
-  union?: Union;
+  id: string;
+  primaryPerson: PersonWithPortrait;
+  spouses: SpouseUnitInfo[];
   generation: number;
   childUnitIds: string[];
   subtreeWidth: number;
@@ -112,17 +115,6 @@ export function calculateFamilyTreePositions(
     parentToChildren.get(rel.parent_id)!.push(rel.child_id);
   }
 
-  // Index union -> children
-  const unionToChildren = new Map<string, string[]>();
-  for (const rel of parentChildRels) {
-    if (rel.union_id) {
-      if (!unionToChildren.has(rel.union_id)) unionToChildren.set(rel.union_id, []);
-      if (!unionToChildren.get(rel.union_id)!.includes(rel.child_id)) {
-        unionToChildren.get(rel.union_id)!.push(rel.child_id);
-      }
-    }
-  }
-
   // 1. Hitung Generasi tiap orang (Top-down propagation)
   const generationMap = new Map<string, number>();
 
@@ -174,68 +166,63 @@ export function calculateFamilyTreePositions(
     if (!generationMap.has(p.id)) generationMap.set(p.id, 0);
   }
 
-  // 2. Bentuk Family Units (Pasangan / Single)
+  // 2. Bentuk Family Units (Mendukung Poligami / Multi-Spouse & Single)
   const placedPeople = new Set<string>();
   const familyUnits: FamilyUnit[] = [];
   const personToUnitId = new Map<string, string>();
 
-  // Buat couple unit untuk setiap union
-  for (const union of unions) {
-    const members = unionToMembers.get(union.id) || [];
-    if (members.length >= 2) {
-      const p1 = peopleMap.get(members[0]);
-      const p2 = peopleMap.get(members[1]);
-      if (p1 && p2 && !placedPeople.has(p1.id) && !placedPeople.has(p2.id)) {
-        // Taruh laki-laki di kiri jika ada informasi gender
-        const personA = p1.gender === "male" || p2.gender === "female" ? p1 : p2;
-        const personB = personA.id === p1.id ? p2 : p1;
+  // Map union id -> union object
+  const unionById = new Map(unions.map((u) => [u.id, u]));
 
-        const gen = Math.min(
-          generationMap.get(personA.id) ?? 0,
-          generationMap.get(personB.id) ?? 0
-        );
+  // Prioritaskan orang yang memiliki keturunan atau garis darah (bukan hanya menantu)
+  const sortedPeople = [...people].sort((a, b) => {
+    const aHasParents = (childToParents.get(a.id) || []).length > 0;
+    const bHasParents = (childToParents.get(b.id) || []).length > 0;
+    if (aHasParents && !bHasParents) return -1;
+    if (!aHasParents && bHasParents) return 1;
+    const aChildren = (parentToChildren.get(a.id) || []).length;
+    const bChildren = (parentToChildren.get(b.id) || []).length;
+    return bChildren - aChildren;
+  });
 
-        const unit: FamilyUnit = {
-          id: `union-${union.id}`,
-          type: "couple",
-          personA,
-          personB,
-          union,
-          generation: gen,
-          childUnitIds: [],
-          subtreeWidth: 0,
-          x: 0,
-          y: gen * GENERATION_HEIGHT,
-        };
+  for (const person of sortedPeople) {
+    if (placedPeople.has(person.id)) continue;
 
-        familyUnits.push(unit);
-        personToUnitId.set(personA.id, unit.id);
-        personToUnitId.set(personB.id, unit.id);
-        placedPeople.add(personA.id);
-        placedPeople.add(personB.id);
+    const uIds = personToUnions.get(person.id) || [];
+    const spouses: SpouseUnitInfo[] = [];
+
+    for (const uId of uIds) {
+      const union = unionById.get(uId);
+      if (!union) continue;
+      const memberIds = unionToMembers.get(uId) || [];
+      const spouseId = memberIds.find((mId) => mId !== person.id);
+      if (spouseId && !placedPeople.has(spouseId)) {
+        const spouseObj = peopleMap.get(spouseId);
+        if (spouseObj) {
+          spouses.push({ spouse: spouseObj, union });
+          placedPeople.add(spouseId);
+        }
       }
     }
-  }
 
-  // Buat single unit untuk yang belum berpasangan
-  for (const person of people) {
-    if (!placedPeople.has(person.id)) {
-      const gen = generationMap.get(person.id) ?? 0;
-      const unit: FamilyUnit = {
-        id: `person-${person.id}`,
-        type: "single",
-        personA: person,
-        generation: gen,
-        childUnitIds: [],
-        subtreeWidth: 0,
-        x: 0,
-        y: gen * GENERATION_HEIGHT,
-      };
+    const gen = generationMap.get(person.id) ?? 0;
+    const unit: FamilyUnit = {
+      id: `unit-${person.id}`,
+      primaryPerson: person,
+      spouses,
+      generation: gen,
+      childUnitIds: [],
+      subtreeWidth: 0,
+      x: 0,
+      y: gen * GENERATION_HEIGHT,
+    };
 
-      familyUnits.push(unit);
-      personToUnitId.set(person.id, unit.id);
-      placedPeople.add(person.id);
+    familyUnits.push(unit);
+    personToUnitId.set(person.id, unit.id);
+    for (const s of spouses) {
+      personToUnitId.set(s.spouse.id, unit.id);
     }
+    placedPeople.add(person.id);
   }
 
   const unitMap = new Map(familyUnits.map((u) => [u.id, u]));
@@ -258,30 +245,30 @@ export function calculateFamilyTreePositions(
     if (unit.childUnitIds.length > 1) {
       let explicitOrder: string[] | undefined;
       if (effectiveChildOrders) {
-        if (unit.union && effectiveChildOrders.has(unit.union.id)) {
-          explicitOrder = effectiveChildOrders.get(unit.union.id);
-        } else if (effectiveChildOrders.has(unit.personA.id)) {
-          explicitOrder = effectiveChildOrders.get(unit.personA.id);
-        } else if (unit.personB && effectiveChildOrders.has(unit.personB.id)) {
-          explicitOrder = effectiveChildOrders.get(unit.personB.id);
+        if (effectiveChildOrders.has(unit.primaryPerson.id)) {
+          explicitOrder = effectiveChildOrders.get(unit.primaryPerson.id);
+        }
+        for (const s of unit.spouses) {
+          if (!explicitOrder && effectiveChildOrders.has(s.union.id)) {
+            explicitOrder = effectiveChildOrders.get(s.union.id);
+          } else if (!explicitOrder && effectiveChildOrders.has(s.spouse.id)) {
+            explicitOrder = effectiveChildOrders.get(s.spouse.id);
+          }
         }
       }
 
-      const parentIds = [unit.personA.id];
-      if (unit.personB) parentIds.push(unit.personB.id);
+      const parentIds = [unit.primaryPerson.id, ...unit.spouses.map((s) => s.spouse.id)];
 
-      // Helper untuk mendapatkan objek Person anak yang sebenarnya dari unit anak (bukan menantu/pasangannya)
       const getChildPerson = (u?: FamilyUnit): PersonWithPortrait | undefined => {
         if (!u) return undefined;
-        if (u.type === "single") return u.personA;
-        // Pada unit pasangan, periksa apakah personA atau personB yang merupakan keturunan dari parentIds
-        const isAChild = parentIds.some((pId) => (parentToChildren.get(pId) || []).includes(u.personA.id));
-        if (isAChild) return u.personA;
-        if (u.personB) {
-          const isBChild = parentIds.some((pId) => (parentToChildren.get(pId) || []).includes(u.personB!.id));
-          if (isBChild) return u.personB;
+        const isPrimaryChild = parentIds.some((pId) => (parentToChildren.get(pId) || []).includes(u.primaryPerson.id));
+        if (isPrimaryChild) return u.primaryPerson;
+        for (const s of u.spouses) {
+          if (parentIds.some((pId) => (parentToChildren.get(pId) || []).includes(s.spouse.id))) {
+            return s.spouse;
+          }
         }
-        return u.personA;
+        return u.primaryPerson;
       };
 
       const originalOrder = new Map(unit.childUnitIds.map((id, idx) => [id, idx]));
@@ -293,7 +280,7 @@ export function calculateFamilyTreePositions(
         const pB = getChildPerson(uB);
         if (!pA || !pB) return (originalOrder.get(aId) ?? 0) - (originalOrder.get(bId) ?? 0);
 
-        // 1. Prioritaskan urutan eksplisit (drag & drop modal / custom order)
+        // 1. Prioritaskan urutan eksplisit (drag & drop modal)
         if (explicitOrder && explicitOrder.length > 0) {
           const idxA = explicitOrder.indexOf(pA.id);
           const idxB = explicitOrder.indexOf(pB.id);
@@ -331,14 +318,12 @@ export function calculateFamilyTreePositions(
           return 1;
         }
 
-        // 4. Default: Pertahankan formasi urutan asli dari database (natural insertion order)
         return (originalOrder.get(aId) ?? 0) - (originalOrder.get(bId) ?? 0);
       });
     }
   }
 
-  // 4. Identifikasi Focal Couple / Zuriat Center
-  // Unit dengan jumlah keturunan terbanyak
+  // 4. Identifikasi Focal Couple / Zuriat Center (Unit dengan keturunan terbanyak)
   function countDescendants(unitId: string, visited = new Set<string>()): number {
     if (visited.has(unitId)) return 0;
     visited.add(unitId);
@@ -362,50 +347,8 @@ export function calculateFamilyTreePositions(
     }
   }
 
-  // Jika tidak ada unit dengan anak, ambil unit generasi teratas pertama
   if (!focalUnit && familyUnits.length > 0) {
     focalUnit = familyUnits[0];
-  }
-
-  // Identifikasi parent units dari focalUnit (Leluhur/Moyang)
-  const focalAncestorUnitIds = new Set<string>();
-  let focalPersonAParentUnit: FamilyUnit | null = null;
-  let focalPersonBParentUnit: FamilyUnit | null = null;
-
-  if (focalUnit) {
-    const pAParentId = (childToParents.get(focalUnit.personA.id) || [])[0];
-    if (pAParentId) {
-      const uId = personToUnitId.get(pAParentId);
-      if (uId && uId !== focalUnit.id) {
-        focalPersonAParentUnit = unitMap.get(uId) || null;
-        if (focalPersonAParentUnit) focalAncestorUnitIds.add(focalPersonAParentUnit.id);
-      }
-    }
-
-    if (focalUnit.personB) {
-      const pBParentId = (childToParents.get(focalUnit.personB.id) || [])[0];
-      if (pBParentId) {
-        const uId = personToUnitId.get(pBParentId);
-        if (uId && uId !== focalUnit.id) {
-          focalPersonBParentUnit = unitMap.get(uId) || null;
-          if (focalPersonBParentUnit) focalAncestorUnitIds.add(focalPersonBParentUnit.id);
-        }
-      }
-    }
-  }
-
-  // Hapus focalUnit dari childUnitIds milik ancestor agar tidak dobel diposisikan di bawah ancestor
-  if (focalUnit) {
-    if (focalPersonAParentUnit) {
-      focalPersonAParentUnit.childUnitIds = focalPersonAParentUnit.childUnitIds.filter(
-        (id) => id !== focalUnit!.id
-      );
-    }
-    if (focalPersonBParentUnit) {
-      focalPersonBParentUnit.childUnitIds = focalPersonBParentUnit.childUnitIds.filter(
-        (id) => id !== focalUnit!.id
-      );
-    }
   }
 
   // 5. Hitung lebar subtree secara rekursif (Bottom-Up)
@@ -414,9 +357,7 @@ export function calculateFamilyTreePositions(
     visited.add(unit.id);
 
     const selfWidth =
-      unit.type === "couple"
-        ? PERSON_NODE_WIDTH * 2 + COUPLE_GAP
-        : PERSON_NODE_WIDTH;
+      PERSON_NODE_WIDTH + unit.spouses.length * (PERSON_NODE_WIDTH + COUPLE_GAP);
 
     if (unit.childUnitIds.length === 0) {
       unit.subtreeWidth = selfWidth;
@@ -436,7 +377,6 @@ export function calculateFamilyTreePositions(
     return unit.subtreeWidth;
   }
 
-  // Hitung lebar semua unit
   for (const u of familyUnits) {
     computeSubtreeWidth(u);
   }
@@ -452,33 +392,28 @@ export function calculateFamilyTreePositions(
     visited.add(unit.id);
 
     const selfWidth =
-      unit.type === "couple"
-        ? PERSON_NODE_WIDTH * 2 + COUPLE_GAP
-        : PERSON_NODE_WIDTH;
+      PERSON_NODE_WIDTH + unit.spouses.length * (PERSON_NODE_WIDTH + COUPLE_GAP);
 
-    // Posisi card sendiri (center dalam rentang subtree)
     const cardX = startX + (unit.subtreeWidth - selfWidth) / 2;
     const cardY = baseY;
 
-    if (unit.type === "couple") {
-      // Suami di kiri
-      positions.set(`person-${unit.personA.id}`, { x: cardX, y: cardY });
+    // Tempatkan Primary Person
+    positions.set(`person-${unit.primaryPerson.id}`, { x: cardX, y: cardY });
 
-      // Node union pernikahan di tengah antara suami dan istri
-      const unionNodeX = cardX + PERSON_NODE_WIDTH + (COUPLE_GAP / 2) - (UNION_NODE_SIZE / 2);
-      const unionNodeY = cardY + (PERSON_NODE_HEIGHT / 2) - (UNION_NODE_SIZE / 2);
-      if (unit.union) {
-        positions.set(`union-${unit.union.id}`, { x: unionNodeX, y: unionNodeY });
-      }
+    // Tempatkan setiap pasangan (Istri 1, Istri 2, dst) beserta simpul nikahnya
+    for (let i = 0; i < unit.spouses.length; i++) {
+      const spouseInfo = unit.spouses[i];
+      const sX = cardX + (i + 1) * (PERSON_NODE_WIDTH + COUPLE_GAP);
+      const uX =
+        cardX +
+        PERSON_NODE_WIDTH +
+        i * (PERSON_NODE_WIDTH + COUPLE_GAP) +
+        COUPLE_GAP / 2 -
+        UNION_NODE_SIZE / 2;
+      const uY = cardY + PERSON_NODE_HEIGHT / 2 - UNION_NODE_SIZE / 2;
 
-      // Istri di kanan berdampingan
-      positions.set(`person-${unit.personB!.id}`, {
-        x: cardX + PERSON_NODE_WIDTH + COUPLE_GAP,
-        y: cardY,
-      });
-    } else {
-      // Single
-      positions.set(`person-${unit.personA.id}`, { x: cardX, y: cardY });
+      positions.set(`person-${spouseInfo.spouse.id}`, { x: sX, y: cardY });
+      positions.set(`union-${spouseInfo.union.id}`, { x: uX, y: uY });
     }
 
     // Tempatkan anak-anaknya di bawah
@@ -490,7 +425,8 @@ export function calculateFamilyTreePositions(
         const childUnit = unitMap.get(unit.childUnitIds[i]);
         if (childUnit && !visited.has(childUnit.id)) {
           validChildren.push(childUnit);
-          totalChildrenWidth += childUnit.subtreeWidth + (validChildren.length > 1 ? SIBLING_GAP : 0);
+          totalChildrenWidth +=
+            childUnit.subtreeWidth + (validChildren.length > 1 ? SIBLING_GAP : 0);
         }
       }
 
@@ -505,40 +441,44 @@ export function calculateFamilyTreePositions(
   const visitedUnits = new Set<string>();
 
   if (focalUnit) {
-    const focalStartY = focalAncestorUnitIds.size > 0 ? GENERATION_HEIGHT : 0;
+    const focalStartY = GENERATION_HEIGHT;
     const focalStartX = 0;
 
-    // Posisikan focal unit dan keturunannya
+    // Posisikan focal unit dan seluruh keturunannya
     assignCoordinates(focalUnit, focalStartX, focalStartY, visitedUnits);
+  }
 
-    const focalPersonAPos = positions.get(`person-${focalUnit.personA.id}`);
-    const focalPersonBPos = focalUnit.personB ? positions.get(`person-${focalUnit.personB.id}`) : null;
+  // 7. Posisikan Orang Tua / Leluhur (Termasuk Orang Tua dari Menantu / Besan)
+  // Menempatkan orang tua tepat di atas anak/menantunya secara rapi
+  let ancestorsPlaced = true;
+  while (ancestorsPlaced) {
+    ancestorsPlaced = false;
+    for (const person of people) {
+      const personPos = positions.get(`person-${person.id}`);
+      if (!personPos) continue;
 
-    // Posisikan orang tua suami (Leluhur Pihak Suami) persis di atas suami
-    if (focalPersonAParentUnit && focalPersonAPos) {
-      const parentWidth =
-        focalPersonAParentUnit.type === "couple"
-          ? PERSON_NODE_WIDTH * 2 + COUPLE_GAP
-          : PERSON_NODE_WIDTH;
-      const pX = focalPersonAPos.x + (PERSON_NODE_WIDTH / 2) - (parentWidth / 2);
-      assignCoordinates(focalPersonAParentUnit, pX, 0, visitedUnits);
-    }
-
-    // Posisikan orang tua istri (Leluhur Pihak Istri) persis di atas istri
-    if (focalPersonBParentUnit && focalPersonBPos) {
-      const parentWidth =
-        focalPersonBParentUnit.type === "couple"
-          ? PERSON_NODE_WIDTH * 2 + COUPLE_GAP
-          : PERSON_NODE_WIDTH;
-      const pX = focalPersonBPos.x + (PERSON_NODE_WIDTH / 2) - (parentWidth / 2);
-      assignCoordinates(focalPersonBParentUnit, pX, 0, visitedUnits);
+      const pParentIds = childToParents.get(person.id) || [];
+      for (const pId of pParentIds) {
+        const parentUnitId = personToUnitId.get(pId);
+        if (parentUnitId && !visitedUnits.has(parentUnitId)) {
+          const parentUnit = unitMap.get(parentUnitId);
+          if (parentUnit) {
+            const pX = personPos.x + PERSON_NODE_WIDTH / 2 - parentUnit.subtreeWidth / 2;
+            const pY = personPos.y - GENERATION_HEIGHT;
+            assignCoordinates(parentUnit, pX, pY, visitedUnits);
+            ancestorsPlaced = true;
+          }
+        }
+      }
     }
   }
 
-  // Sisanya yang belum diposisikan (jika ada unit independen lain)
+  // 8. Posisikan sisa unit yang belum terhubung (Standalone families)
   let extraX = 0;
   for (const pos of positions.values()) {
-    if (pos.x + PERSON_NODE_WIDTH > extraX) extraX = pos.x + PERSON_NODE_WIDTH + SIBLING_GAP * 2;
+    if (pos.x + PERSON_NODE_WIDTH > extraX) {
+      extraX = pos.x + PERSON_NODE_WIDTH + SIBLING_GAP * 2;
+    }
   }
 
   for (const unit of familyUnits) {
