@@ -8,6 +8,8 @@ import { PersonChildrenList } from "@/components/people/PersonChildrenList";
 import type { PersonProfile } from "@/types/genealogy";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cleanId = decodeURIComponent(id).trim().replace(/[\s_]+/g, "-");

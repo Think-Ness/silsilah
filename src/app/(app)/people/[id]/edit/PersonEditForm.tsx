@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { updatePerson, archivePerson } from "@/lib/genealogy/people";
+import { updatePersonServerAction } from "@/app/actions/people";
 import { uploadMedia, linkMediaToPerson, removePersonPortrait, getMediaUrl } from "@/lib/genealogy/media";
 import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/PersonPhotoUpload";
 import { GenderSelector, LifeStatusSelector, DatePrecisionSelector } from "@/components/people/FormSelectors";
@@ -90,39 +91,32 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
       const payload = {
         ...form,
         portrait_media_id: portraitMediaId,
-        display_name: form.display_name.trim() || undefined,
-        nickname: form.nickname.trim() || undefined,
-        prefix_title: form.prefix_title.trim() || undefined,
-        suffix_title: form.suffix_title.trim() || undefined,
-        birth_date: form.birth_date.trim() || undefined,
-        birth_place: form.birth_place.trim() || undefined,
-        death_date: form.death_date.trim() || undefined,
-        death_place: form.death_place.trim() || undefined,
-        biography: form.biography.trim() || undefined,
-        occupation: form.occupation.trim() || undefined,
-        education: form.education.trim() || undefined,
-        notes: form.notes.trim() || undefined,
+        display_name: form.display_name?.trim() || null,
+        nickname: form.nickname?.trim() || null,
+        prefix_title: form.prefix_title?.trim() || null,
+        suffix_title: form.suffix_title?.trim() || null,
+        birth_date: form.birth_date?.trim() || null,
+        birth_place: form.birth_place?.trim() || null,
+        death_date: form.death_date?.trim() || null,
+        death_place: form.death_place?.trim() || null,
+        biography: form.biography?.trim() || null,
+        occupation: form.occupation?.trim() || null,
+        education: form.education?.trim() || null,
+        notes: form.notes?.trim() || null,
       };
 
-      // Coba server action terlebih dahulu (autentikasi server cookies)
-      try {
-        const { updatePersonServerAction } = await import("@/app/actions/people");
-        await updatePersonServerAction(person.id, payload);
-      } catch {
-        // Fallback ke client-side update
-        await updatePerson(person.id, payload);
-      }
+      // Simpan langsung melalui Server Action dengan autentikasi cookies sesi dan revalidasi cache
+      await updatePersonServerAction(person.id, payload);
 
-      // Invalidate query cache silsilah, orang, dan profil agar perubahan langsung tampil seketika (0ms delay)
+      // Invalidate cache TanStack Query
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["canvas-data"] }),
         queryClient.invalidateQueries({ queryKey: ["people"] }),
         queryClient.invalidateQueries({ queryKey: ["person-profile", person.id] }),
       ]);
-      router.refresh();
 
-      toast.success("Profil dan foto berhasil diperbarui");
-      router.push(`/people/${person.id}`);
+      toast.success("Profil dan data anggota berhasil diperbarui");
+      window.location.href = `/people/${person.id}`;
     } catch (err: any) {
       console.error("Error saving person:", err);
       toast.error(err?.message || "Gagal menyimpan perubahan");

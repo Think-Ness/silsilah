@@ -443,52 +443,19 @@ export async function getOrBootstrapUserProfile(supabaseClient?: any): Promise<{
     }
 
     if (profile) {
-      // If user is already super_admin, return
-      if (profile.role === "super_admin") {
-        return { profile: { ...profile, email: user.email } as Profile, user, error: null };
-      }
-
-      // If user is not super_admin, check if ANY active super_admin exists in profiles
-      const { count: superAdminCount } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "super_admin");
-
-      if (!superAdminCount || superAdminCount === 0) {
-        // No super_admin in the system! Promote current user to super_admin
-        const { data: updatedProfile } = await supabase
-          .from("profiles")
-          .update({ role: "super_admin", updated_at: new Date().toISOString() })
-          .eq("id", user.id)
-          .select()
-          .single();
-
-        return {
-          profile: ({ ...(updatedProfile || profile), role: "super_admin", email: user.email }) as Profile,
-          user,
-          error: null,
-        };
-      }
-
+      // Profil sudah ada di database, gunakan role yang tersimpan tanpa mengubahnya
       return { profile: { ...profile, email: user.email } as Profile, user, error: null };
     }
 
-    // 2. Profile doesn't exist yet: bootstrap new profile
+    // 2. Profile belum ada: periksa apakah ini pengguna pertama sama sekali
     const { count: totalProfiles } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true });
 
     const isFirstUser = !totalProfiles || totalProfiles === 0;
-
-    const { count: superAdminCount } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "super_admin");
-
-    const roleToAssign: UserRole =
-      isFirstUser || !superAdminCount || superAdminCount === 0
-        ? "super_admin"
-        : ((user.user_metadata?.role as UserRole) || "family_member");
+    const roleToAssign: UserRole = isFirstUser
+      ? "super_admin"
+      : ((user.user_metadata?.role as UserRole) || "family_member");
 
     const newProfileData = {
       id: user.id,
