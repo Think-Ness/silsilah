@@ -2,10 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { updatePerson } from "@/lib/genealogy/people";
-import type { CreatePersonInput } from "@/types/genealogy";
+import type { CreatePersonInput, UpdatePersonInput } from "@/types/genealogy";
 import { revalidatePath } from "next/cache";
 
-export async function updatePersonServerAction(id: string, input: Partial<CreatePersonInput>) {
+export async function updatePersonServerAction(id: string, input: UpdatePersonInput) {
   const sb = await createClient();
   const cleanId = decodeURIComponent(id).trim().replace(/[\s_]+/g, "-");
   const result = await updatePerson(cleanId, input, sb);

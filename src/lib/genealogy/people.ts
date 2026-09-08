@@ -8,6 +8,7 @@ import type {
   PersonWithPortrait,
   PersonProfile,
   CreatePersonInput,
+  UpdatePersonInput,
 } from "@/types/genealogy";
 
 const supabase = createClient();
@@ -222,7 +223,7 @@ export async function createPerson(
 /** Update person */
 export async function updatePerson(
   id: string,
-  input: Partial<CreatePersonInput>,
+  input: UpdatePersonInput,
   customClient?: any
 ): Promise<Person> {
   const sb = customClient || supabase;

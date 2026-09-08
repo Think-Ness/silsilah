@@ -262,25 +262,58 @@ export interface CanvasGraph {
 
 export interface CreatePersonInput {
   full_name: string;
+  display_name?: string;
+  nickname?: string;
+  prefix_title?: string;
+  suffix_title?: string;
+  gender: Gender;
+  birth_date?: string;
+  birth_date_precision?: DatePrecision;
+  birth_place?: string;
+  death_date?: string;
+  death_date_precision?: DatePrecision;
+  death_place?: string;
+  life_status: LifeStatus;
+  biography?: string;
+  occupation?: string;
+  education?: string;
+  notes?: string;
+  portrait_media_id?: string | null;
+  visibility: Visibility;
+}
+
+export type UpdatePersonInput = Partial<
+  Omit<
+    CreatePersonInput,
+    | "display_name"
+    | "nickname"
+    | "prefix_title"
+    | "suffix_title"
+    | "birth_date"
+    | "birth_place"
+    | "death_date"
+    | "death_place"
+    | "biography"
+    | "occupation"
+    | "education"
+    | "notes"
+    | "portrait_media_id"
+  >
+> & {
   display_name?: string | null;
   nickname?: string | null;
   prefix_title?: string | null;
   suffix_title?: string | null;
-  gender: Gender;
   birth_date?: string | null;
-  birth_date_precision?: DatePrecision;
   birth_place?: string | null;
   death_date?: string | null;
-  death_date_precision?: DatePrecision;
   death_place?: string | null;
-  life_status: LifeStatus;
   biography?: string | null;
   occupation?: string | null;
   education?: string | null;
   notes?: string | null;
   portrait_media_id?: string | null;
-  visibility: Visibility;
-}
+};
 
 export interface CreateUnionInput {
   relationship_type: UnionRelationshipType;
