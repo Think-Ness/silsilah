@@ -335,3 +335,44 @@ export interface CreateParentChildInput {
   biological_status?: BiologicalStatus;
   notes?: string;
 }
+
+// ============================================================
+// CANVAS ENTITIES (Multi-Canvas / POV Silsilah)
+// ============================================================
+
+export interface Canvas {
+  id: string;
+  title: string;
+  slug?: string | null;
+  description?: string | null;
+  root_person_id?: string | null;
+  root_person?: PersonWithPortrait | null;
+  custom_positions?: Record<string, { x: number; y: number }> | null;
+  settings?: {
+    displayMode?: "full" | "branch" | "ancestors" | "descendants";
+    theme?: string;
+    [key: string]: any;
+  } | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+}
+
+export interface CreateCanvasInput {
+  title: string;
+  description?: string | null;
+  root_person_id?: string | null;
+  is_default?: boolean;
+  settings?: Record<string, any>;
+}
+
+export interface UpdateCanvasInput {
+  title?: string;
+  description?: string | null;
+  root_person_id?: string | null;
+  custom_positions?: Record<string, { x: number; y: number }> | null;
+  settings?: Record<string, any>;
+  is_default?: boolean;
+}
+

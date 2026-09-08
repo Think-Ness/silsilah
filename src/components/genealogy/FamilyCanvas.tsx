@@ -37,6 +37,8 @@ const nodeTypes = {
 };
 
 interface FamilyCanvasProps {
+  canvasId?: string;
+  rootPersonId?: string | null;
   people: PersonWithPortrait[];
   unions: Union[];
   unionMembers: UnionMember[];
@@ -48,6 +50,8 @@ interface FamilyCanvasProps {
 }
 
 function CanvasInner({
+  canvasId = "default-canvas",
+  rootPersonId,
   people,
   unions,
   unionMembers,
@@ -74,7 +78,10 @@ function CanvasInner({
       localStorage.removeItem("silsilah_custom_positions_v2");
       localStorage.removeItem("silsilah_custom_positions_v3");
 
-      const saved = localStorage.getItem("silsilah_custom_positions_v4");
+      const saved =
+        localStorage.getItem(`silsilah_canvas_positions_${canvasId}`) ||
+        localStorage.getItem("silsilah_custom_positions_v4");
+
       if (saved) {
         const parsed = JSON.parse(saved);
         customPositionsMap = new Map(Object.entries(parsed));
@@ -88,7 +95,9 @@ function CanvasInner({
       unions,
       unionMembers,
       parentChildRels,
-      customPositionsMap
+      customPositionsMap,
+      undefined,
+      rootPersonId
     );
 
     // Mark selected node
@@ -104,14 +113,11 @@ function CanvasInner({
     setNodes(markedNodes);
     setEdges(initialEdges);
 
-    // Otomatis posisikan pohon keluarga di tengah layar HANYA saat data pertama kali dimuat
-    if (!hasInitialFitRef.current && initialNodes.length > 0) {
-      hasInitialFitRef.current = true;
-      setTimeout(() => {
-        fitView({ duration: 400, padding: 0.15 });
-      }, 80);
-    }
-  }, [people, unions, unionMembers, parentChildRels]);
+    // Otomatis posisikan pohon keluarga di tengah layar saat data/kanvas berganti
+    setTimeout(() => {
+      fitView({ duration: 400, padding: 0.15 });
+    }, 80);
+  }, [people, unions, unionMembers, parentChildRels, canvasId, rootPersonId]);
 
   // Update seleksi node secara instan tanpa rebuild seluruh graf atau reset zoom/posisi
   useEffect(() => {
@@ -155,6 +161,7 @@ function CanvasInner({
             posMap[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
           }
         }
+        localStorage.setItem(`silsilah_canvas_positions_${canvasId}`, JSON.stringify(posMap));
         localStorage.setItem("silsilah_custom_positions_v4", JSON.stringify(posMap));
 
         // Deteksi apakah node yang digeser adalah anak dalam kelompok saudara kandung
@@ -237,14 +244,16 @@ function CanvasInner({
           unions,
           unionMembers,
           parentChildRels,
-          customPosMap
+          customPosMap,
+          undefined,
+          rootPersonId
         );
         setEdges(updatedEdges);
       } catch (e) {
         console.warn("Gagal menyimpan posisi custom node:", e);
       }
     },
-    [parentChildRels, people, unions, unionMembers]
+    [parentChildRels, people, unions, unionMembers, canvasId, rootPersonId]
   );
 
   // Listener saat urutan anak diperbarui dari modal dialog
@@ -252,7 +261,9 @@ function CanvasInner({
     const handleOrderUpdated = () => {
       let customPositionsMap: Map<string, { x: number; y: number }> | undefined;
       try {
-        const saved = localStorage.getItem("silsilah_custom_positions_v4");
+        const saved =
+          localStorage.getItem(`silsilah_canvas_positions_${canvasId}`) ||
+          localStorage.getItem("silsilah_custom_positions_v4");
         if (saved) {
           const parsed = JSON.parse(saved);
           customPositionsMap = new Map(Object.entries(parsed));
@@ -264,7 +275,9 @@ function CanvasInner({
         unions,
         unionMembers,
         parentChildRels,
-        customPositionsMap
+        customPositionsMap,
+        undefined,
+        rootPersonId
       );
       setNodes(newNodes);
       setEdges(newEdges);
@@ -272,7 +285,7 @@ function CanvasInner({
 
     window.addEventListener("silsilah:child-order-updated", handleOrderUpdated);
     return () => window.removeEventListener("silsilah:child-order-updated", handleOrderUpdated);
-  }, [people, unions, unionMembers, parentChildRels]);
+  }, [people, unions, unionMembers, parentChildRels, canvasId, rootPersonId]);
 
   // Listener untuk membuka modal edit status pernikahan saat icon cincin di klik
   useEffect(() => {
@@ -318,6 +331,7 @@ function CanvasInner({
     setIsLayoutRunning(true);
     try {
       // Hapus posisi kustom agar kembali ke tata letak cerdas otomatis
+      localStorage.removeItem(`silsilah_canvas_positions_${canvasId}`);
       localStorage.removeItem("silsilah_custom_positions_v4");
       localStorage.removeItem("silsilah_custom_positions_v3");
       localStorage.removeItem("silsilah_custom_positions_v2");
@@ -327,7 +341,10 @@ function CanvasInner({
         people,
         unions,
         unionMembers,
-        parentChildRels
+        parentChildRels,
+        undefined,
+        undefined,
+        rootPersonId
       );
       setNodes(initialNodes);
       setEdges(initialEdges);
@@ -339,7 +356,7 @@ function CanvasInner({
     } finally {
       setIsLayoutRunning(false);
     }
-  }, [people, unions, unionMembers, parentChildRels, fitView]);
+  }, [people, unions, unionMembers, parentChildRels, canvasId, rootPersonId, fitView]);
 
   const handlePrintCanvas = useCallback(() => {
     // Posisikan pohon keluarga di tengah dengan margin yang pas untuk halaman cetak

@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FamilyCanvas } from "@/components/genealogy/FamilyCanvas";
 import { ZuriatChartView } from "@/components/genealogy/ZuriatChartView";
+import { CanvasSelector } from "@/components/genealogy/CanvasSelector";
+import { CreateCanvasModal } from "@/components/genealogy/CreateCanvasModal";
 import { QuickAddMemberModal, type QuickAddActionType } from "@/components/genealogy/QuickAddMemberModal";
 import { ReorderChildrenModal } from "@/components/genealogy/ReorderChildrenModal";
 import { DeletePersonDialog } from "@/components/people/DeletePersonDialog";
@@ -11,9 +13,11 @@ import { PersonDetailPanel } from "@/components/people/PersonDetailPanel";
 import { PersonBottomSheet } from "@/components/people/PersonBottomSheet";
 import { getAllPeople, getPersonProfile } from "@/lib/genealogy/people";
 import { getAllUnions, getAllParentChildRelationships } from "@/lib/genealogy/relationships";
+import { getAllCanvases, deleteCanvas, updateCanvas } from "@/lib/genealogy/canvases";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LayoutGrid, Network, Edit3, Check, Users, Printer } from "lucide-react";
+import type { Canvas } from "@/types/genealogy";
 
 const supabase = createClient();
 
@@ -50,6 +54,14 @@ export default function FamilyTreePage() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   // Default kanvas interaktif dengan zoom & drag aktif
   const [viewMode, setViewMode] = useState<"canvas" | "zuriat">("canvas");
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+  const [createCanvasModal, setCreateCanvasModal] = useState<{
+    open: boolean;
+    initialRootPersonId?: string | null;
+  }>({
+    open: false,
+    initialRootPersonId: null,
+  });
   const [familyTitle, setFamilyTitle] = useState("Silsilah Zuriat Ahlan & Hj. Siti Maskah");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(familyTitle);
@@ -135,15 +147,68 @@ export default function FamilyTreePage() {
       }
     };
 
+    const handleOpenCreateCanvas = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        rootPersonId?: string;
+        personName?: string;
+      }>;
+      if (customEvent.detail) {
+        setCreateCanvasModal({
+          open: true,
+          initialRootPersonId: customEvent.detail.rootPersonId || null,
+        });
+      }
+    };
+
     window.addEventListener("silsilah:quick-add", handleQuickAddEvent);
     window.addEventListener("silsilah:delete-person", handleDeleteEvent);
     window.addEventListener("silsilah:reorder-children", handleReorderEvent);
+    window.addEventListener("silsilah:open-create-canvas", handleOpenCreateCanvas);
     return () => {
       window.removeEventListener("silsilah:quick-add", handleQuickAddEvent);
       window.removeEventListener("silsilah:delete-person", handleDeleteEvent);
       window.removeEventListener("silsilah:reorder-children", handleReorderEvent);
+      window.removeEventListener("silsilah:open-create-canvas", handleOpenCreateCanvas);
     };
   }, []);
+
+  // Query daftar semua kanvas
+  const { data: canvasesData = [] } = useQuery({
+    queryKey: ["canvases-list"],
+    queryFn: () => getAllCanvases(),
+    staleTime: 10 * 1000,
+  });
+
+  // Listener event update kanvas
+  useEffect(() => {
+    const handleCanvasesUpdated = (e: Event) => {
+      queryClient.invalidateQueries({ queryKey: ["canvases-list"] });
+      const customEvent = e as CustomEvent<{ canvasId?: string; deleted?: boolean }>;
+      if (customEvent.detail?.canvasId && !customEvent.detail?.deleted) {
+        setActiveCanvasId(customEvent.detail.canvasId);
+      }
+    };
+
+    window.addEventListener("silsilah:canvases-updated", handleCanvasesUpdated);
+    return () => window.removeEventListener("silsilah:canvases-updated", handleCanvasesUpdated);
+  }, [queryClient]);
+
+  // Kanvas aktif saat ini
+  const activeCanvas = useMemo(() => {
+    if (activeCanvasId && canvasesData.length > 0) {
+      const found = canvasesData.find((c) => c.id === activeCanvasId);
+      if (found) return found;
+    }
+    return canvasesData.find((c) => c.is_default) || canvasesData[0] || null;
+  }, [activeCanvasId, canvasesData]);
+
+  // Sync title input saat kanvas aktif berganti
+  useEffect(() => {
+    if (activeCanvas) {
+      setFamilyTitle(activeCanvas.title);
+      setTitleInput(activeCanvas.title);
+    }
+  }, [activeCanvas]);
 
   const handleQuickAddSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
@@ -158,20 +223,17 @@ export default function FamilyTreePage() {
     queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
   }, [queryClient]);
 
-  // Load judul kustom dari localStorage jika ada
-  useEffect(() => {
-    const saved = localStorage.getItem("silsilah_custom_title");
-    if (saved) {
-      setFamilyTitle(saved);
-      setTitleInput(saved);
-    }
-  }, []);
-
-  const handleTitleChange = useCallback((newTitle: string) => {
-    setFamilyTitle(newTitle);
-    setTitleInput(newTitle);
-    localStorage.setItem("silsilah_custom_title", newTitle);
-  }, []);
+  const handleTitleChange = useCallback(
+    async (newTitle: string) => {
+      setFamilyTitle(newTitle);
+      setTitleInput(newTitle);
+      if (activeCanvas) {
+        await updateCanvas(activeCanvas.id, { title: newTitle });
+        queryClient.invalidateQueries({ queryKey: ["canvases-list"] });
+      }
+    },
+    [activeCanvas, queryClient]
+  );
 
   const handleSaveTitleInput = () => {
     setIsEditingTitle(false);
@@ -179,6 +241,33 @@ export default function FamilyTreePage() {
       handleTitleChange(titleInput.trim());
     }
   };
+
+  const handleSelectCanvas = useCallback((canvas: Canvas) => {
+    setActiveCanvasId(canvas.id);
+    setFamilyTitle(canvas.title);
+    setTitleInput(canvas.title);
+  }, []);
+
+  const handleDeleteCanvas = useCallback(
+    async (canvasId: string) => {
+      await deleteCanvas(canvasId);
+      queryClient.invalidateQueries({ queryKey: ["canvases-list"] });
+      if (activeCanvasId === canvasId) {
+        setActiveCanvasId(null);
+      }
+    },
+    [activeCanvasId, queryClient]
+  );
+
+  const handleCreateCanvasSuccess = useCallback(
+    (newCanvas: Canvas) => {
+      queryClient.invalidateQueries({ queryKey: ["canvases-list"] });
+      setActiveCanvasId(newCanvas.id);
+      setFamilyTitle(newCanvas.title);
+      setTitleInput(newCanvas.title);
+    },
+    [queryClient]
+  );
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["canvas-data"],
@@ -220,6 +309,13 @@ export default function FamilyTreePage() {
         () => {
           queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
           queryClient.invalidateQueries({ queryKey: ["person-profile"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "canvases" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["canvases-list"] });
         }
       )
       .subscribe();
@@ -489,8 +585,18 @@ export default function FamilyTreePage() {
           )}
         </div>
 
-        {/* Center: Editable Title */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        {/* Center: Canvas Selector & Editable Title */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <CanvasSelector
+            canvases={canvasesData}
+            activeCanvasId={activeCanvas?.id || null}
+            onSelectCanvas={handleSelectCanvas}
+            onCreateNewClick={() =>
+              setCreateCanvasModal({ open: true, initialRootPersonId: null })
+            }
+            onDeleteCanvas={handleDeleteCanvas}
+          />
+
           {isEditingTitle ? (
             <form
               onSubmit={(e) => {
@@ -512,36 +618,25 @@ export default function FamilyTreePage() {
                   borderRadius: "6px",
                   padding: "4px 10px",
                   outline: "none",
-                  minWidth: "260px",
+                  minWidth: "220px",
                 }}
               />
               <button
                 type="submit"
                 className="p-1 rounded hover:bg-emerald-100 text-emerald-700 transition-colors"
-                title="Simpan"
+                title="Simpan Judul"
               >
                 <Check className="w-4 h-4" />
               </button>
             </form>
           ) : (
-            <div
+            <button
               onClick={() => setIsEditingTitle(true)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                cursor: "pointer",
-                padding: "4px 8px",
-                borderRadius: "6px",
-              }}
-              className="hover:bg-[var(--subtle)] transition-colors"
-              title="Klik untuk mengubah judul silsilah"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Ubah Nama Kanvas Ini"
             >
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--foreground)" }}>
-                {familyTitle}
-              </span>
-              <Edit3 className="w-3.5 h-3.5 text-[var(--muted)]" />
-            </div>
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
 
@@ -574,6 +669,8 @@ export default function FamilyTreePage() {
             />
           ) : (
             <FamilyCanvas
+              canvasId={activeCanvas?.id || "default-canvas"}
+              rootPersonId={activeCanvas?.root_person_id || null}
               people={data?.people || []}
               unions={data?.unions || []}
               unionMembers={data?.unionMembers || []}
@@ -632,6 +729,15 @@ export default function FamilyTreePage() {
           />
         )}
       </div>
+
+      {/* Create New Canvas Modal */}
+      <CreateCanvasModal
+        open={createCanvasModal.open}
+        people={data?.people || []}
+        initialRootPersonId={createCanvasModal.initialRootPersonId}
+        onClose={() => setCreateCanvasModal({ open: false, initialRootPersonId: null })}
+        onSuccess={handleCreateCanvasSuccess}
+      />
 
       {/* Quick Add Member Modal via Canvas Hover Actions */}
       <QuickAddMemberModal

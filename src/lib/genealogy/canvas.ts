@@ -84,7 +84,8 @@ export function calculateFamilyTreePositions(
   unions: Union[],
   unionMembers: UnionMember[],
   parentChildRels: ParentChildRelationship[],
-  customChildOrders?: Map<string, string[]>
+  customChildOrders?: Map<string, string[]>,
+  rootPersonId?: string | null
 ): Map<string, { x: number; y: number }> {
   const effectiveChildOrders = customChildOrders || getStoredChildOrders();
   const positions = new Map<string, { x: number; y: number }>();
@@ -338,15 +339,26 @@ export function calculateFamilyTreePositions(
     return count;
   }
 
-  // 4. Identifikasi Focal Couple / Zuriat Center (Unit dengan anak langsung terbanyak)
+  // 4. Identifikasi Focal Couple / Zuriat Center
   let focalUnit: FamilyUnit | null = null;
-  let maxDirectChildren = -1;
 
-  for (const unit of familyUnits) {
-    const childCount = unit.childUnitIds.length;
-    if (childCount > maxDirectChildren && childCount > 0) {
-      maxDirectChildren = childCount;
-      focalUnit = unit;
+  if (rootPersonId) {
+    focalUnit =
+      familyUnits.find(
+        (u) =>
+          u.primaryPerson.id === rootPersonId ||
+          u.spouses.some((s) => s.spouse.id === rootPersonId)
+      ) || null;
+  }
+
+  if (!focalUnit) {
+    let maxDirectChildren = -1;
+    for (const unit of familyUnits) {
+      const childCount = unit.childUnitIds.length;
+      if (childCount > maxDirectChildren && childCount > 0) {
+        maxDirectChildren = childCount;
+        focalUnit = unit;
+      }
     }
   }
 
@@ -569,7 +581,8 @@ export function buildCanvasGraph(
   unionMembers: UnionMember[],
   parentChildRels: ParentChildRelationship[],
   customPositions?: Map<string, { x: number; y: number }>,
-  customChildOrders?: Map<string, string[]>
+  customChildOrders?: Map<string, string[]>,
+  rootPersonId?: string | null
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -583,7 +596,8 @@ export function buildCanvasGraph(
     unions,
     unionMembers,
     parentChildRels,
-    effectiveChildOrders
+    effectiveChildOrders,
+    rootPersonId
   );
 
   // Map union -> members
@@ -624,13 +638,15 @@ export function buildCanvasGraph(
     return cnt;
   }
 
-  let focalPersonId: string | null = null;
-  let maxDesc = -1;
-  for (const p of people) {
-    const dCount = getDescendantCount(p.id);
-    if (dCount > maxDesc && dCount > 0) {
-      maxDesc = dCount;
-      focalPersonId = p.id;
+  let focalPersonId: string | null = rootPersonId || null;
+  if (!focalPersonId) {
+    let maxDesc = -1;
+    for (const p of people) {
+      const dCount = getDescendantCount(p.id);
+      if (dCount > maxDesc && dCount > 0) {
+        maxDesc = dCount;
+        focalPersonId = p.id;
+      }
     }
   }
 

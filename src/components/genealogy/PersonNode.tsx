@@ -2,7 +2,7 @@
 
 import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { User, UserPlus, Heart, Plus, Trash2, ArrowUpDown, ListOrdered } from "lucide-react";
+import { User, UserPlus, Heart, Plus, Trash2, ArrowUpDown, ListOrdered, Layers } from "lucide-react";
 import type { PersonNodeData } from "@/lib/genealogy/canvas";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import { useCurrentUser } from "@/context/UserRoleContext";
@@ -85,6 +85,18 @@ export const PersonNode = memo(function PersonNode({
       new CustomEvent("silsilah:delete-person", {
         detail: {
           personId: person.id,
+          personName: displayName,
+        },
+      })
+    );
+  };
+
+  const handleOpenCreateCanvas = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(
+      new CustomEvent("silsilah:open-create-canvas", {
+        detail: {
+          rootPersonId: person.id,
           personName: displayName,
         },
       })
@@ -299,6 +311,16 @@ export const PersonNode = memo(function PersonNode({
               <span>Urutan</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleOpenCreateCanvas}
+            title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
+            aria-label="Buat Kanvas Silsilah"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
+          >
+            <Layers className="w-3 h-3 text-cyan-300" />
+            <span>+ Kanvas</span>
+          </button>
         </div>
       )}
 
