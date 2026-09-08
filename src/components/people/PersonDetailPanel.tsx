@@ -1,6 +1,6 @@
 "use client";
 
-import { X, User, ArrowRight, Pencil, Trash2 } from "lucide-react";
+import { X, User, ArrowRight, Pencil, Trash2, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import type { PersonProfile } from "@/types/genealogy";
 import { getMediaUrl } from "@/lib/genealogy/media";
@@ -127,8 +127,43 @@ export function PersonDetailPanel({ profile, onClose }: PersonDetailPanelProps) 
           {/* Children */}
           {profile.children.length > 0 && (
             <Section title="Anak">
-              <div style={{ fontSize: "13px", color: "var(--foreground)" }}>
-                {profile.children.length} anak
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                <div style={{ fontSize: "13px", color: "var(--foreground)", fontWeight: 600 }}>
+                  {profile.children.length} anak
+                </div>
+                {profile.children.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("silsilah:reorder-children", {
+                          detail: {
+                            parentId: profile.id,
+                            parentName: displayName,
+                          },
+                        })
+                      );
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#059669",
+                      background: "rgba(16, 185, 129, 0.12)",
+                      border: "1px solid rgba(16, 185, 129, 0.25)",
+                      cursor: "pointer",
+                    }}
+                    className="hover:bg-emerald-500/20 transition-colors"
+                    title="Atur urutan kelahiran anak (Drag to reorder)"
+                  >
+                    <ArrowUpDown className="w-3 h-3" />
+                    Atur Urutan
+                  </button>
+                )}
               </div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px" }}>
                 {profile.children.slice(0, 3).map((c) => getDisplayName(c)).join(", ")}

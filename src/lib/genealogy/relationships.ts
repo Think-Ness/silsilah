@@ -224,3 +224,30 @@ export async function getRelationshipStats(client?: any): Promise<{
     totalParentChild: pcrRes.count || 0,
   };
 }
+
+/** Update urutan anak untuk parent atau union tertentu */
+export async function updateChildOrder(
+  parentId: string,
+  orderedChildIds: string[],
+  coParentId?: string | null
+): Promise<void> {
+  try {
+    const parentIds = [parentId];
+    if (coParentId && !parentIds.includes(coParentId)) {
+      parentIds.push(coParentId);
+    }
+
+    const promises = orderedChildIds.map((childId, idx) =>
+      supabase
+        .from("parent_child_relationships")
+        .update({ sort_order: idx })
+        .in("parent_id", parentIds)
+        .eq("child_id", childId)
+    );
+
+    await Promise.all(promises);
+  } catch (err) {
+    console.warn("Gagal update sort_order ke Supabase (fallback lokal aktif):", err);
+  }
+}
+

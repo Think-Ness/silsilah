@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FamilyCanvas } from "@/components/genealogy/FamilyCanvas";
 import { ZuriatChartView } from "@/components/genealogy/ZuriatChartView";
 import { QuickAddMemberModal, type QuickAddActionType } from "@/components/genealogy/QuickAddMemberModal";
+import { ReorderChildrenModal } from "@/components/genealogy/ReorderChildrenModal";
 import { DeletePersonDialog } from "@/components/people/DeletePersonDialog";
 import { PersonDetailPanel } from "@/components/people/PersonDetailPanel";
 import { PersonBottomSheet } from "@/components/people/PersonBottomSheet";
@@ -76,9 +77,19 @@ export default function FamilyTreePage() {
     personName: "",
   });
 
+  const [reorderModal, setReorderModal] = useState<{
+    open: boolean;
+    parentId: string | null;
+    parentName: string;
+  }>({
+    open: false,
+    parentId: null,
+    parentName: "",
+  });
+
   const isMobile = useIsMobile();
 
-  // Listener untuk aksi tambah cepat dan hapus anggota dari kanvas
+  // Listener untuk aksi tambah cepat, hapus anggota, dan atur urutan anak dari kanvas
   useEffect(() => {
     const handleQuickAddEvent = (e: Event) => {
       const customEvent = e as CustomEvent<{
@@ -110,11 +121,27 @@ export default function FamilyTreePage() {
       }
     };
 
+    const handleReorderEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        parentId: string;
+        parentName: string;
+      }>;
+      if (customEvent.detail) {
+        setReorderModal({
+          open: true,
+          parentId: customEvent.detail.parentId,
+          parentName: customEvent.detail.parentName,
+        });
+      }
+    };
+
     window.addEventListener("silsilah:quick-add", handleQuickAddEvent);
     window.addEventListener("silsilah:delete-person", handleDeleteEvent);
+    window.addEventListener("silsilah:reorder-children", handleReorderEvent);
     return () => {
       window.removeEventListener("silsilah:quick-add", handleQuickAddEvent);
       window.removeEventListener("silsilah:delete-person", handleDeleteEvent);
+      window.removeEventListener("silsilah:reorder-children", handleReorderEvent);
     };
   }, []);
 
@@ -125,6 +152,10 @@ export default function FamilyTreePage() {
   const handleDeleteSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
     setSelectedPersonId(null);
+  }, [queryClient]);
+
+  const handleReorderSuccess = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["canvas-data"] });
   }, [queryClient]);
 
   // Load judul kustom dari localStorage jika ada
@@ -472,6 +503,19 @@ export default function FamilyTreePage() {
         personName={deleteModal.personName}
         onClose={() => setDeleteModal((prev) => ({ ...prev, open: false }))}
         onSuccess={handleDeleteSuccess}
+      />
+
+      {/* Reorder Children Modal via Drag & Drop */}
+      <ReorderChildrenModal
+        open={reorderModal.open}
+        parentId={reorderModal.parentId}
+        parentName={reorderModal.parentName}
+        people={data?.people || []}
+        parentChildRels={data?.parentChildRels || []}
+        unions={data?.unions || []}
+        unionMembers={data?.unionMembers || []}
+        onClose={() => setReorderModal((prev) => ({ ...prev, open: false }))}
+        onSuccess={handleReorderSuccess}
       />
     </div>
   );

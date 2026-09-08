@@ -22,6 +22,9 @@ export interface PersonNodeData {
   isHighlighted?: boolean;
   hasFather?: boolean;
   hasMother?: boolean;
+  childrenCount?: number;
+  childOrderNumber?: number;
+  childOrderLabel?: string;
   [key: string]: unknown;
 }
 
@@ -51,13 +54,33 @@ interface FamilyUnit {
   y: number;
 }
 
+function getStoredChildOrders(): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("silsilah_child_order_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        for (const [key, val] of Object.entries(parsed)) {
+          if (Array.isArray(val)) {
+            map.set(key, val as string[]);
+          }
+        }
+      }
+    } catch (e) {}
+  }
+  return map;
+}
+
 /** Hitung tata letak pohon silsilah keluarga terstruktur per generasi */
 export function calculateFamilyTreePositions(
   people: PersonWithPortrait[],
   unions: Union[],
   unionMembers: UnionMember[],
-  parentChildRels: ParentChildRelationship[]
+  parentChildRels: ParentChildRelationship[],
+  customChildOrders?: Map<string, string[]>
 ): Map<string, { x: number; y: number }> {
+  const effectiveChildOrders = customChildOrders || getStoredChildOrders();
   const positions = new Map<string, { x: number; y: number }>();
   if (people.length === 0) return positions;
 
@@ -226,6 +249,70 @@ export function calculateFamilyTreePositions(
       if (parentUnit && !parentUnit.childUnitIds.includes(childUnitId)) {
         parentUnit.childUnitIds.push(childUnitId);
       }
+    }
+  }
+
+  // 3.5. Urutkan childUnitIds untuk setiap parent unit (Anak ke-1 di kiri, ke-2 dst)
+  for (const unit of familyUnits) {
+    if (unit.childUnitIds.length > 1) {
+      let explicitOrder: string[] | undefined;
+      if (effectiveChildOrders) {
+        if (unit.union && effectiveChildOrders.has(unit.union.id)) {
+          explicitOrder = effectiveChildOrders.get(unit.union.id);
+        } else if (effectiveChildOrders.has(unit.personA.id)) {
+          explicitOrder = effectiveChildOrders.get(unit.personA.id);
+        } else if (unit.personB && effectiveChildOrders.has(unit.personB.id)) {
+          explicitOrder = effectiveChildOrders.get(unit.personB.id);
+        }
+      }
+
+      const parentIds = [unit.personA.id];
+      if (unit.personB) parentIds.push(unit.personB.id);
+
+      unit.childUnitIds.sort((aId, bId) => {
+        const uA = unitMap.get(aId);
+        const uB = unitMap.get(bId);
+        const pA = uA?.personA;
+        const pB = uB?.personA;
+        if (!pA || !pB) return 0;
+
+        // 1. Prioritaskan urutan eksplisit (drag & drop modal / canvas drag)
+        if (explicitOrder && explicitOrder.length > 0) {
+          const idxA = explicitOrder.indexOf(pA.id);
+          const idxB = explicitOrder.indexOf(pB.id);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+        }
+
+        // 2. Prioritaskan sort_order dari database parentChildRels
+        const relA = parentChildRels.find(
+          (r) => r.child_id === pA.id && parentIds.includes(r.parent_id)
+        );
+        const relB = parentChildRels.find(
+          (r) => r.child_id === pB.id && parentIds.includes(r.parent_id)
+        );
+
+        if (
+          relA &&
+          relB &&
+          typeof relA.sort_order === "number" &&
+          typeof relB.sort_order === "number"
+        ) {
+          if (relA.sort_order !== relB.sort_order) {
+            return relA.sort_order - relB.sort_order;
+          }
+        }
+
+        // 3. Fallback: Tanggal lahir (tertua di kiri)
+        if (pA.birth_date && pB.birth_date) {
+          return pA.birth_date.localeCompare(pB.birth_date);
+        }
+        if (pA.birth_date) return -1;
+        if (pB.birth_date) return 1;
+
+        return 0;
+      });
     }
   }
 
@@ -449,11 +536,13 @@ export function buildCanvasGraph(
   unions: Union[],
   unionMembers: UnionMember[],
   parentChildRels: ParentChildRelationship[],
-  customPositions?: Map<string, { x: number; y: number }>
+  customPositions?: Map<string, { x: number; y: number }>,
+  customChildOrders?: Map<string, string[]>
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
+  const effectiveChildOrders = customChildOrders || getStoredChildOrders();
   const peopleMap = new Map(people.map((p) => [p.id, p]));
 
   // Hitung posisi pohon hierarkis cerdas
@@ -461,7 +550,8 @@ export function buildCanvasGraph(
     people,
     unions,
     unionMembers,
-    parentChildRels
+    parentChildRels,
+    effectiveChildOrders
   );
 
   // Map union -> members
@@ -650,6 +740,60 @@ export function buildCanvasGraph(
       }
     }
 
+    // Hitung urutan anak di antara saudara kandung
+    let childOrderNumber: number | undefined;
+    let childOrderLabel: string | undefined;
+
+    if (pIds.length > 0) {
+      const primaryParentId = pIds[0];
+      const siblings = parentToChildrenMap.get(primaryParentId) || [];
+      if (siblings.length > 1) {
+        let explicitOrder: string[] | undefined;
+        if (effectiveChildOrders) {
+          explicitOrder =
+            effectiveChildOrders.get(primaryParentId) ||
+            (pIds.length > 1 ? effectiveChildOrders.get(pIds[1]) : undefined);
+        }
+
+        const sortedSiblings = [...siblings].sort((aId, bId) => {
+          const pA = peopleMap.get(aId);
+          const pB = peopleMap.get(bId);
+          if (!pA || !pB) return 0;
+
+          if (explicitOrder && explicitOrder.length > 0) {
+            const idxA = explicitOrder.indexOf(pA.id);
+            const idxB = explicitOrder.indexOf(pB.id);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+          }
+
+          const relA = parentChildRels.find((r) => r.child_id === aId && pIds.includes(r.parent_id));
+          const relB = parentChildRels.find((r) => r.child_id === bId && pIds.includes(r.parent_id));
+          if (relA && relB && typeof relA.sort_order === "number" && typeof relB.sort_order === "number") {
+            if (relA.sort_order !== relB.sort_order) return relA.sort_order - relB.sort_order;
+          }
+
+          if (pA.birth_date && pB.birth_date) return pA.birth_date.localeCompare(pB.birth_date);
+          if (pA.birth_date) return -1;
+          if (pB.birth_date) return 1;
+
+          return 0;
+        });
+
+        const sIdx = sortedSiblings.indexOf(person.id);
+        if (sIdx !== -1) {
+          childOrderNumber = sIdx + 1;
+          childOrderLabel = `Anak ke-${sIdx + 1}`;
+        }
+      } else if (siblings.length === 1) {
+        childOrderNumber = 1;
+        childOrderLabel = "Anak Tunggal";
+      }
+    }
+
+    const childrenCount = (parentToChildrenMap.get(person.id) || []).length;
+
     nodes.push({
       id: `person-${person.id}`,
       type: "personNode",
@@ -663,6 +807,9 @@ export function buildCanvasGraph(
         generation: depth ?? 0,
         hasFather,
         hasMother,
+        childrenCount,
+        childOrderNumber,
+        childOrderLabel,
       } as PersonNodeData,
       width: PERSON_NODE_WIDTH,
       height: PERSON_NODE_HEIGHT,

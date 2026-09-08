@@ -116,6 +116,7 @@ export interface ParentChildRelationship {
   union_id: string | null;
   relationship_type: RelationshipType;
   biological_status: BiologicalStatus;
+  sort_order?: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

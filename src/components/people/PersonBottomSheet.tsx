@@ -1,6 +1,6 @@
 "use client";
 
-import { X, User, ArrowRight, Pencil, Trash2, UserPlus, Heart, Plus } from "lucide-react";
+import { X, User, ArrowRight, Pencil, Trash2, UserPlus, Heart, Plus, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { PersonProfile } from "@/types/genealogy";
@@ -171,8 +171,30 @@ export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) 
             )}
             {profile.children.length > 0 && (
               <InfoRow label="Anak">
-                <div>{profile.children.length} anak</div>
-                <div className="text-[12px] text-[var(--muted)] mt-0.5">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-[var(--foreground)]">{profile.children.length} anak</div>
+                  {profile.children.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        window.dispatchEvent(
+                          new CustomEvent("silsilah:reorder-children", {
+                            detail: {
+                              parentId: profile.id,
+                              parentName: displayName,
+                            },
+                          })
+                        );
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 transition-colors cursor-pointer"
+                    >
+                      <ArrowUpDown className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Atur Urutan
+                    </button>
+                  )}
+                </div>
+                <div className="text-[12px] text-[var(--muted)] mt-1">
                   {profile.children.slice(0, 4).map((c) => getDisplayName(c)).join(", ")}
                   {profile.children.length > 4 && ` dan ${profile.children.length - 4} lainnya`}
                 </div>

@@ -2,7 +2,7 @@
 
 import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { User, UserPlus, Heart, Plus, Trash2 } from "lucide-react";
+import { User, UserPlus, Heart, Plus, Trash2, ArrowUpDown, ListOrdered } from "lucide-react";
 import type { PersonNodeData } from "@/lib/genealogy/canvas";
 import { getMediaUrl } from "@/lib/genealogy/media";
 
@@ -252,8 +252,8 @@ export const PersonNode = memo(function PersonNode({
         </div>
       )}
 
-      {/* Floating Action Button: Bottom (+ Anak) */}
-      {spouses && spouses.length > 0 && (
+      {/* Floating Action Button: Bottom (+ Anak & Atur Urutan) */}
+      {((spouses && spouses.length > 0) || (data.childrenCount != null && data.childrenCount > 0)) && (
         <div
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -261,16 +261,40 @@ export const PersonNode = memo(function PersonNode({
             showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         >
-          <button
-            type="button"
-            onClick={(e) => handleQuickAdd(e, "add_child")}
-            title="Tambah Anak"
-            aria-label="Tambah Anak"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-800/95 hover:bg-emerald-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-emerald-600/60"
-          >
-            <Plus className="w-3 h-3 text-emerald-200" />
-            <span>Anak</span>
-          </button>
+          {spouses && spouses.length > 0 && (
+            <button
+              type="button"
+              onClick={(e) => handleQuickAdd(e, "add_child")}
+              title="Tambah Anak"
+              aria-label="Tambah Anak"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/95 hover:bg-emerald-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-emerald-600/60"
+            >
+              <Plus className="w-3 h-3 text-emerald-200" />
+              <span>Anak</span>
+            </button>
+          )}
+          {data.childrenCount != null && data.childrenCount > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.dispatchEvent(
+                  new CustomEvent("silsilah:reorder-children", {
+                    detail: {
+                      parentId: person.id,
+                      parentName: displayName,
+                    },
+                  })
+                );
+              }}
+              title="Atur Urutan Kelahiran Anak (Drag & Drop)"
+              aria-label="Atur Urutan Anak"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-emerald-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+            >
+              <ArrowUpDown className="w-3 h-3 text-emerald-300" />
+              <span>Urutan</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -300,24 +324,43 @@ export const PersonNode = memo(function PersonNode({
         style={{ width: 8, height: 8, background: "#D97706", border: "2px solid #FFFFFF" }}
       />
 
-      {/* Top Bar: Role Status Badge */}
+      {/* Top Bar: Role Status Badge & Child Order */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-        <span
-          style={{
-            fontSize: "10px",
-            fontWeight: 700,
-            padding: "2px 7px",
-            borderRadius: "4px",
-            background: badge.bg,
-            color: badge.color,
-            border: `1px solid ${badge.border}`,
-            letterSpacing: "0.02em",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {badge.label}
-        </span>
-        <span style={{ fontSize: "10px", color: "var(--muted)", fontWeight: 500 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, overflow: "hidden" }}>
+          <span
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: "4px",
+              background: badge.bg,
+              color: badge.color,
+              border: `1px solid ${badge.border}`,
+              letterSpacing: "0.02em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {badge.label}
+          </span>
+          {data.childOrderLabel && (
+            <span
+              style={{
+                fontSize: "9.5px",
+                fontWeight: 700,
+                padding: "2px 6px",
+                borderRadius: "4px",
+                background: "rgba(16, 185, 129, 0.12)",
+                color: "#047857",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                letterSpacing: "0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {data.childOrderLabel}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: "10px", color: "var(--muted)", fontWeight: 500, flexShrink: 0 }}>
           {person.gender === "male" ? "Laki-laki" : person.gender === "female" ? "Perempuan" : ""}
         </span>
       </div>
