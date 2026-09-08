@@ -4,6 +4,7 @@ import { ArrowLeft, Pencil, User, MapPin, Phone, BookOpen, GraduationCap, Briefc
 import { getPersonProfile } from "@/lib/genealogy/people";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
+import { PersonChildrenList } from "@/components/people/PersonChildrenList";
 import type { PersonProfile } from "@/types/genealogy";
 import { createClient } from "@/lib/supabase/server";
 
@@ -211,19 +212,11 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
           )}
 
           {profile.children.length > 0 && (
-            <div>
-              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "4px" }}>Anak ({profile.children.length})</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                {profile.children.map((c, i) => (
-                  <div key={c.id} style={{ fontSize: "14px", color: "var(--foreground)" }}>
-                    <span style={{ color: "var(--muted)", marginRight: "8px", fontSize: "12px" }}>{i + 1}.</span>
-                    <Link href={`/people/${c.id}`} style={{ color: "var(--accent-color)", textDecoration: "none" }}>
-                      {getDisplayName(c)}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PersonChildrenList
+              parentId={profile.id}
+              initialChildren={profile.children}
+              spouseIds={profile.spouses.map((s) => s.person.id)}
+            />
           )}
         </div>
       </Section>

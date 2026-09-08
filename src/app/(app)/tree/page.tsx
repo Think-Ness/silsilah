@@ -217,11 +217,51 @@ export default function FamilyTreePage() {
     const childIds = new Set(childRels.map((r) => r.child_id));
     const children = data.people.filter((p) => childIds.has(p.id));
 
+    // Urutkan daftar anak sesuai custom child order, sort_order DB, atau birth_date
+    let customChildOrder: string[] = [];
+    try {
+      const raw = localStorage.getItem("silsilah_child_order_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        customChildOrder = parsed[selectedPersonId] || [];
+        if (customChildOrder.length === 0 && myUnionIds.size > 0) {
+          for (const uId of myUnionIds) {
+            if (parsed[uId]?.length > 0) {
+              customChildOrder = parsed[uId];
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    const sortedChildren = [...children].sort((a, b) => {
+      if (customChildOrder.length > 0) {
+        const idxA = customChildOrder.indexOf(a.id);
+        const idxB = customChildOrder.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+      }
+
+      const relA = childRels.find((r) => r.child_id === a.id);
+      const relB = childRels.find((r) => r.child_id === b.id);
+      if (relA && relB && typeof relA.sort_order === "number" && typeof relB.sort_order === "number") {
+        if (relA.sort_order !== relB.sort_order) return relA.sort_order - relB.sort_order;
+      }
+
+      if (a.birth_date && b.birth_date) return a.birth_date.localeCompare(b.birth_date);
+      if (a.birth_date) return -1;
+      if (b.birth_date) return 1;
+
+      return a.full_name.localeCompare(b.full_name);
+    });
+
     return {
       ...person,
       parents,
       spouses,
-      children,
+      children: sortedChildren,
       addresses: [],
       contacts: [],
       media: [],
@@ -235,7 +275,44 @@ export default function FamilyTreePage() {
     staleTime: 60 * 1000,
   });
 
-  const selectedProfile = serverProfile || instantProfile;
+  const rawProfile = serverProfile || instantProfile;
+
+  // Pastikan profile yang ditampilkan di side panel / bottom sheet mengikuti urutan anak kustom
+  const selectedProfile = useMemo(() => {
+    if (!rawProfile || !rawProfile.children || rawProfile.children.length <= 1) {
+      return rawProfile;
+    }
+
+    let customOrder: string[] = [];
+    try {
+      const raw = localStorage.getItem("silsilah_child_order_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        customOrder = parsed[rawProfile.id] || [];
+        if (customOrder.length === 0 && rawProfile.spouses?.length > 0) {
+          for (const sp of rawProfile.spouses) {
+            if (parsed[sp.person.id]?.length > 0) {
+              customOrder = parsed[sp.person.id];
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    if (customOrder.length === 0) return rawProfile;
+
+    const sortedChildren = [...rawProfile.children].sort((a, b) => {
+      const idxA = customOrder.indexOf(a.id);
+      const idxB = customOrder.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return 0;
+    });
+
+    return { ...rawProfile, children: sortedChildren };
+  }, [rawProfile]);
 
   const handlePersonClick = useCallback((personId: string) => {
     setSelectedPersonId((prev) => (prev === personId ? null : personId));

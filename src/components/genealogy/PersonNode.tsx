@@ -116,7 +116,7 @@ export const PersonNode = memo(function PersonNode({
           bg: "#D1FAE5",
           color: "#065F46",
           border: "#6EE7B7",
-          label: roleLabel || "Anak Kandung",
+          label: data.childOrderLabel || roleLabel || "Anak Kandung",
         };
       case "in_law":
         return {
@@ -324,45 +324,75 @@ export const PersonNode = memo(function PersonNode({
         style={{ width: 8, height: 8, background: "#D97706", border: "2px solid #FFFFFF" }}
       />
 
-      {/* Top Bar: Role Status Badge & Child Order */}
+      {/* Top Bar: Role Status Badge & Minimal Gender Icon */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, overflow: "hidden" }}>
+        <span
+          style={{
+            fontSize: "10px",
+            fontWeight: 700,
+            padding: "2px 7px",
+            borderRadius: "4px",
+            background: badge.bg,
+            color: badge.color,
+            border: `1px solid ${badge.border}`,
+            letterSpacing: "0.02em",
+            whiteSpace: "nowrap",
+            maxWidth: "185px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {badge.label}
+        </span>
+
+        {/* Minimal Gender Icon */}
+        {person.gender === "male" && (
           <span
+            title="Laki-laki"
             style={{
-              fontSize: "10px",
-              fontWeight: 700,
-              padding: "2px 7px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 18,
+              height: 18,
               borderRadius: "4px",
-              background: badge.bg,
-              color: badge.color,
-              border: `1px solid ${badge.border}`,
-              letterSpacing: "0.02em",
-              whiteSpace: "nowrap",
+              background: "rgba(59, 130, 246, 0.12)",
+              color: "#2563EB",
+              border: "1px solid rgba(59, 130, 246, 0.25)",
+              flexShrink: 0,
             }}
           >
-            {badge.label}
+            <svg style={{ width: 10, height: 10 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="10" cy="14" r="5" />
+              <path d="M19 5l-5.4 5.4" />
+              <path d="M19 5h-5" />
+              <path d="M19 5v5" />
+            </svg>
           </span>
-          {data.childOrderLabel && (
-            <span
-              style={{
-                fontSize: "9.5px",
-                fontWeight: 700,
-                padding: "2px 6px",
-                borderRadius: "4px",
-                background: "rgba(16, 185, 129, 0.12)",
-                color: "#047857",
-                border: "1px solid rgba(16, 185, 129, 0.3)",
-                letterSpacing: "0.01em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {data.childOrderLabel}
-            </span>
-          )}
-        </div>
-        <span style={{ fontSize: "10px", color: "var(--muted)", fontWeight: 500, flexShrink: 0 }}>
-          {person.gender === "male" ? "Laki-laki" : person.gender === "female" ? "Perempuan" : ""}
-        </span>
+        )}
+        {person.gender === "female" && (
+          <span
+            title="Perempuan"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 18,
+              height: 18,
+              borderRadius: "4px",
+              background: "rgba(244, 63, 94, 0.12)",
+              color: "#E11D48",
+              border: "1px solid rgba(244, 63, 94, 0.25)",
+              flexShrink: 0,
+            }}
+          >
+            <svg style={{ width: 10, height: 10 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="9" r="5" />
+              <path d="M12 14v7" />
+              <path d="M9 18h6" />
+            </svg>
+          </span>
+        )}
       </div>
 
       {/* Main Info: Photo + Name */}
@@ -408,13 +438,6 @@ export const PersonNode = memo(function PersonNode({
               </span>
             )}
           </div>
-
-          {/* Deceased tag if applicable */}
-          {isDeceased && (
-            <div style={{ fontSize: "10px", color: "#6B7280", marginTop: "2px", fontStyle: "italic" }}>
-              Almarhum/Almarhumah
-            </div>
-          )}
         </div>
       </div>
 

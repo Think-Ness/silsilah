@@ -89,7 +89,7 @@ export async function getPersonProfile(id: string, client?: any): Promise<Person
     getPerson(cleanId, sb),
     sb.from("parent_child_relationships").select("parent_id").eq("child_id", cleanId),
     sb.from("union_members").select("union_id").eq("person_id", cleanId),
-    sb.from("parent_child_relationships").select("child_id").eq("parent_id", cleanId),
+    sb.from("parent_child_relationships").select("child_id, sort_order, created_at").eq("parent_id", cleanId).order("sort_order", { ascending: true }),
     sb.from("addresses").select("*").eq("person_id", cleanId).order("is_current", { ascending: false }),
     sb.from("contacts").select("*").eq("person_id", cleanId),
     sb.from("person_media").select("*").eq("person_id", cleanId),
@@ -99,7 +99,8 @@ export async function getPersonProfile(id: string, client?: any): Promise<Person
 
   const parentIds = (parentRelsRes.data || []).map((r: any) => r.parent_id);
   const unionIds = (unionMembershipsRes.data || []).map((um: any) => um.union_id);
-  const childIds = [...new Set((childRelsRes.data || []).map((r: any) => r.child_id))];
+  const childRels = (childRelsRes.data || []) as Array<{ child_id: string; sort_order?: number | null; created_at?: string }>;
+  const childIds = [...new Set(childRels.map((r) => r.child_id))];
 
   // Step 2: Eksekusi query relasi sekunder secara paralel
   const [parentsRes, unionsRes, spouseMembersRes, childrenRes] = await Promise.all([
@@ -150,11 +151,39 @@ export async function getPersonProfile(id: string, client?: any): Promise<Person
     }
   }
 
+  // Map sort_order anak dari parent_child_relationships
+  const childSortOrderMap = new Map<string, number>();
+  for (const rel of childRels) {
+    if (typeof rel.sort_order === "number") {
+      childSortOrderMap.set(rel.child_id, rel.sort_order);
+    }
+  }
+
+  // Urutkan daftar anak secara presisi berdasarkan sort_order atau tanggal lahir
+  const sortedChildren = ((childrenRes.data as PersonWithPortrait[]) || []).sort((a, b) => {
+    const orderA = childSortOrderMap.get(a.id);
+    const orderB = childSortOrderMap.get(b.id);
+    if (typeof orderA === "number" && typeof orderB === "number" && orderA !== orderB) {
+      return orderA - orderB;
+    }
+    if (typeof orderA === "number") return -1;
+    if (typeof orderB === "number") return 1;
+
+    // Fallback: Tanggal lahir (tertua di atas)
+    if (a.birth_date && b.birth_date) {
+      return a.birth_date.localeCompare(b.birth_date);
+    }
+    if (a.birth_date) return -1;
+    if (b.birth_date) return 1;
+
+    return a.full_name.localeCompare(b.full_name);
+  });
+
   return {
     ...person,
     parents: (parentsRes.data as PersonWithPortrait[]) || [],
     spouses,
-    children: (childrenRes.data as PersonWithPortrait[]) || [],
+    children: sortedChildren,
     addresses: addressesRes.data || [],
     contacts: contactsRes.data || [],
     media: mediaRes.data || [],
