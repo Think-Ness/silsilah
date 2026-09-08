@@ -72,8 +72,9 @@ function CanvasInner({
       // Bersihkan cache posisi lama yang bertumpuk dari sesi sebelumnya
       localStorage.removeItem("silsilah_custom_positions");
       localStorage.removeItem("silsilah_custom_positions_v2");
+      localStorage.removeItem("silsilah_custom_positions_v3");
 
-      const saved = localStorage.getItem("silsilah_custom_positions_v3");
+      const saved = localStorage.getItem("silsilah_custom_positions_v4");
       if (saved) {
         const parsed = JSON.parse(saved);
         customPositionsMap = new Map(Object.entries(parsed));
@@ -154,7 +155,7 @@ function CanvasInner({
             posMap[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
           }
         }
-        localStorage.setItem("silsilah_custom_positions_v3", JSON.stringify(posMap));
+        localStorage.setItem("silsilah_custom_positions_v4", JSON.stringify(posMap));
 
         // Deteksi apakah node yang digeser adalah anak dalam kelompok saudara kandung
         if (draggedNode && draggedNode.id && draggedNode.id.startsWith("person-")) {
@@ -251,7 +252,7 @@ function CanvasInner({
     const handleOrderUpdated = () => {
       let customPositionsMap: Map<string, { x: number; y: number }> | undefined;
       try {
-        const saved = localStorage.getItem("silsilah_custom_positions_v3");
+        const saved = localStorage.getItem("silsilah_custom_positions_v4");
         if (saved) {
           const parsed = JSON.parse(saved);
           customPositionsMap = new Map(Object.entries(parsed));
@@ -317,6 +318,7 @@ function CanvasInner({
     setIsLayoutRunning(true);
     try {
       // Hapus posisi kustom agar kembali ke tata letak cerdas otomatis
+      localStorage.removeItem("silsilah_custom_positions_v4");
       localStorage.removeItem("silsilah_custom_positions_v3");
       localStorage.removeItem("silsilah_custom_positions_v2");
       localStorage.removeItem("silsilah_custom_positions");

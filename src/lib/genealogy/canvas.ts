@@ -338,13 +338,14 @@ export function calculateFamilyTreePositions(
     return count;
   }
 
+  // 4. Identifikasi Focal Couple / Zuriat Center (Unit dengan anak langsung terbanyak)
   let focalUnit: FamilyUnit | null = null;
-  let maxDescendants = -1;
+  let maxDirectChildren = -1;
 
   for (const unit of familyUnits) {
-    const descCount = countDescendants(unit.id);
-    if (descCount > maxDescendants && descCount > 0) {
-      maxDescendants = descCount;
+    const childCount = unit.childUnitIds.length;
+    if (childCount > maxDirectChildren && childCount > 0) {
+      maxDirectChildren = childCount;
       focalUnit = unit;
     }
   }
@@ -405,11 +406,23 @@ export function calculateFamilyTreePositions(
       Math.max(1, unit.spouses.length) * (PERSON_NODE_HEIGHT + SPOUSE_STACK_GAP) -
       SPOUSE_STACK_GAP;
 
-    unit.x = startX;
-    unit.y = baseY;
+    // Filter anak-anak yang belum divisit
+    const validChildren: FamilyUnit[] = [];
+    for (let i = 0; i < unit.childUnitIds.length; i++) {
+      const childUnit = unitMap.get(unit.childUnitIds[i]);
+      if (childUnit && !visited.has(childUnit.id)) {
+        validChildren.push(childUnit);
+      }
+    }
 
-    const cardX = startX + (unit.subtreeWidth - selfWidth) / 2;
+    // Jika unit ini tidak menaungi anak baru (misal unit leluhur),
+    // gunakan selfWidth agar tidak tergeser oleh subtreeWidth anak yang sudah ditaruh duluan
+    const effectiveWidth = validChildren.length > 0 ? unit.subtreeWidth : selfWidth;
+    const cardX = startX + (effectiveWidth - selfWidth) / 2;
     const cardY = baseY;
+
+    unit.x = cardX;
+    unit.y = cardY;
 
     // Tempatkan Primary Person (Suami di kolom kiri)
     positions.set(`person-${unit.primaryPerson.id}`, { x: cardX, y: cardY });
@@ -430,18 +443,12 @@ export function calculateFamilyTreePositions(
       positions.set(`union-${spouseInfo.union.id}`, { x: uX, y: uY });
     }
 
-    // Tempatkan anak-anak di bawah unit ini (dengan jarak aman dari tumpukan istri)
-    if (unit.childUnitIds.length > 0) {
+    // Tempatkan anak-anak di bawah unit ini jika ada
+    if (validChildren.length > 0) {
       let totalChildrenWidth = 0;
-      const validChildren: FamilyUnit[] = [];
-
-      for (let i = 0; i < unit.childUnitIds.length; i++) {
-        const childUnit = unitMap.get(unit.childUnitIds[i]);
-        if (childUnit && !visited.has(childUnit.id)) {
-          validChildren.push(childUnit);
-          totalChildrenWidth +=
-            childUnit.subtreeWidth + (validChildren.length > 1 ? SIBLING_GAP : 0);
-        }
+      for (let i = 0; i < validChildren.length; i++) {
+        totalChildrenWidth +=
+          validChildren[i].subtreeWidth + (i > 0 ? SIBLING_GAP : 0);
       }
 
       let currentChildX = startX + (unit.subtreeWidth - totalChildrenWidth) / 2;
@@ -465,6 +472,11 @@ export function calculateFamilyTreePositions(
 
   // 7. Posisikan Orang Tua / Leluhur & Besan (Anti Tabrakan dengan Gap Luas)
   // Menempatkan orang tua tepat di atas anak dan menantunya dengan jarak renggang & simetris
+  const getParentUnitSelfWidth = (u: FamilyUnit) =>
+    u.spouses.length > 0
+      ? PERSON_NODE_WIDTH + COUPLE_GAP + PERSON_NODE_WIDTH
+      : PERSON_NODE_WIDTH;
+
   let ancestorsPlaced = true;
   while (ancestorsPlaced) {
     ancestorsPlaced = false;
@@ -504,7 +516,8 @@ export function calculateFamilyTreePositions(
         // Hanya 1 orang tua (misal hanya orang tua suami, atau hanya orang tua menantu)
         const item = parentUnitsToPlace[0];
         const memberPos = positions.get(`person-${item.member.id}`) || { x: unit.x, y: unit.y };
-        const pX = memberPos.x + PERSON_NODE_WIDTH / 2 - item.parentUnit.subtreeWidth / 2;
+        const pWidth = getParentUnitSelfWidth(item.parentUnit);
+        const pX = memberPos.x + PERSON_NODE_WIDTH / 2 - pWidth / 2;
         assignCoordinates(item.parentUnit, pX, pY, visitedUnits);
         ancestorsPlaced = true;
       } else {
@@ -512,8 +525,8 @@ export function calculateFamilyTreePositions(
         // Hitung total lebar kedua keluarga dengan BESAN_GAP yang luas agar tidak bertumpuk
         let totalParentWidth = 0;
         for (let i = 0; i < parentUnitsToPlace.length; i++) {
-          totalParentWidth +=
-            parentUnitsToPlace[i].parentUnit.subtreeWidth + (i > 0 ? BESAN_GAP : 0);
+          const pWidth = getParentUnitSelfWidth(parentUnitsToPlace[i].parentUnit);
+          totalParentWidth += pWidth + (i > 0 ? BESAN_GAP : 0);
         }
 
         const firstPos = positions.get(`person-${parentUnitsToPlace[0].member.id}`) || { x: unit.x, y: unit.y };
@@ -522,8 +535,9 @@ export function calculateFamilyTreePositions(
 
         let curParentX = coupleMidX - totalParentWidth / 2;
         for (const item of parentUnitsToPlace) {
+          const pWidth = getParentUnitSelfWidth(item.parentUnit);
           assignCoordinates(item.parentUnit, curParentX, pY, visitedUnits);
-          curParentX += item.parentUnit.subtreeWidth + BESAN_GAP;
+          curParentX += pWidth + BESAN_GAP;
           ancestorsPlaced = true;
         }
       }
