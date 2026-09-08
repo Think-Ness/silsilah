@@ -10,17 +10,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { updatePerson, archivePerson } from "@/lib/genealogy/people";
-import type { Person, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
+import { uploadMedia, linkMediaToPerson, removePersonPortrait, getMediaUrl } from "@/lib/genealogy/media";
+import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/PersonPhotoUpload";
+import type { PersonWithPortrait, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
 import { toast } from "sonner";
 
 interface PersonEditFormProps {
-  person: Person;
+  person: PersonWithPortrait;
 }
 
 export default function PersonEditForm({ person }: PersonEditFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [archiving, setArchiving] = useState(false);
+
+  const initialPhotoUrl = person.portrait ? getMediaUrl(person.portrait.storage_path) : null;
+  const [photoState, setPhotoState] = useState<PhotoUploadState>({
+    file: null,
+    previewUrl: null,
+    isRemoved: false,
+  });
 
   const [form, setForm] = useState({
     full_name: person.full_name,
@@ -54,8 +63,27 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
     }
     setLoading(true);
     try {
+      let portraitMediaId = person.portrait_media_id;
+
+      // 1. Jika foto dihapus oleh pengguna
+      if (photoState.isRemoved) {
+        await removePersonPortrait(person.id);
+        portraitMediaId = null;
+      }
+      // 2. Jika ada file foto baru yang sudah dikompresi
+      else if (photoState.file) {
+        const mediaTitle = `Foto ${form.display_name || form.full_name}`;
+        const media = await uploadMedia(photoState.file, {
+          title: mediaTitle,
+          description: `Foto profil untuk ${form.full_name}`,
+        });
+        await linkMediaToPerson(person.id, media.id, "portrait", true);
+        portraitMediaId = media.id;
+      }
+
       const payload = {
         ...form,
+        portrait_media_id: portraitMediaId,
         display_name: form.display_name.trim() || undefined,
         nickname: form.nickname.trim() || undefined,
         prefix_title: form.prefix_title.trim() || undefined,
@@ -79,7 +107,7 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
         await updatePerson(person.id, payload);
       }
 
-      toast.success("Profil berhasil diperbarui");
+      toast.success("Profil dan foto berhasil diperbarui");
       router.push(`/people/${person.id}`);
     } catch (err: any) {
       console.error("Error saving person:", err);
@@ -124,6 +152,15 @@ export default function PersonEditForm({ person }: PersonEditFormProps) {
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
+        {/* Foto Profil / Personel */}
+        <div style={{ marginBottom: "24px" }}>
+          <PersonPhotoUpload
+            currentPhotoUrl={initialPhotoUrl}
+            onChange={(state) => setPhotoState(state)}
+            disabled={loading}
+          />
+        </div>
+
         {/* Informasi Dasar */}
         <div className="form-section">
           <h2 className="form-section-title">Informasi Dasar</h2>

@@ -88,6 +88,24 @@ export async function linkMediaToPerson(
   if (error) throw error;
 }
 
+/** Lepaskan foto profil (portrait) dari person */
+export async function removePersonPortrait(personId: string): Promise<void> {
+  // 1. Set portrait_media_id ke null pada tabel people
+  const { error: personErr } = await supabase
+    .from("people")
+    .update({ portrait_media_id: null })
+    .eq("id", personId);
+
+  if (personErr) throw personErr;
+
+  // 2. Non-aktifkan primary portrait di person_media
+  await supabase
+    .from("person_media")
+    .update({ is_primary_portrait: false })
+    .eq("person_id", personId)
+    .eq("is_primary_portrait", true);
+}
+
 /** Dapatkan public URL dari storage path */
 export function getMediaUrl(storagePath: string): string {
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);

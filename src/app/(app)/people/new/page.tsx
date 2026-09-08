@@ -10,12 +10,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { createPerson } from "@/lib/genealogy/people";
+import { uploadMedia, linkMediaToPerson } from "@/lib/genealogy/media";
+import { PersonPhotoUpload, type PhotoUploadState } from "@/components/people/PersonPhotoUpload";
 import type { CreatePersonInput, Gender, LifeStatus, DatePrecision, Visibility } from "@/types/genealogy";
 import { toast } from "sonner";
 
 export default function NewPersonPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [photoState, setPhotoState] = useState<PhotoUploadState>({
+    file: null,
+    previewUrl: null,
+    isRemoved: false,
+  });
 
   const [form, setForm] = useState<CreatePersonInput>({
     full_name: "",
@@ -54,8 +61,22 @@ export default function NewPersonPage() {
 
     setLoading(true);
     try {
+      let portraitMediaId: string | undefined = undefined;
+
+      // 1. Unggah foto jika dipilih dan sudah dikompres
+      if (photoState.file) {
+        const mediaTitle = `Foto ${form.display_name || form.full_name}`;
+        const media = await uploadMedia(photoState.file, {
+          title: mediaTitle,
+          description: `Foto profil untuk ${form.full_name}`,
+        });
+        portraitMediaId = media.id;
+      }
+
+      // 2. Buat data anggota dengan portrait_media_id
       const person = await createPerson({
         ...form,
+        portrait_media_id: portraitMediaId,
         display_name: form.display_name || undefined,
         nickname: form.nickname || undefined,
         prefix_title: form.prefix_title || undefined,
@@ -69,6 +90,12 @@ export default function NewPersonPage() {
         education: form.education || undefined,
         notes: form.notes || undefined,
       });
+
+      // 3. Hubungkan person_media
+      if (portraitMediaId) {
+        await linkMediaToPerson(person.id, portraitMediaId, "portrait", true);
+      }
+
       toast.success(`${form.display_name || form.full_name} berhasil ditambahkan`);
       router.push(`/people/${person.id}`);
     } catch (err) {
@@ -98,6 +125,14 @@ export default function NewPersonPage() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
+        {/* Foto Profil / Personel */}
+        <div style={{ marginBottom: "24px" }}>
+          <PersonPhotoUpload
+            onChange={(state) => setPhotoState(state)}
+            disabled={loading}
+          />
+        </div>
+
         {/* ──────────── INFORMASI DASAR ──────────── */}
         <div className="form-section">
           <h2 className="form-section-title">Informasi Dasar</h2>

@@ -278,6 +278,7 @@ export interface CreatePersonInput {
   occupation?: string;
   education?: string;
   notes?: string;
+  portrait_media_id?: string | null;
   visibility: Visibility;
 }
 
