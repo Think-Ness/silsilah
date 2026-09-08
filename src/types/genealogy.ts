@@ -262,22 +262,22 @@ export interface CanvasGraph {
 
 export interface CreatePersonInput {
   full_name: string;
-  display_name?: string;
-  nickname?: string;
-  prefix_title?: string;
-  suffix_title?: string;
+  display_name?: string | null;
+  nickname?: string | null;
+  prefix_title?: string | null;
+  suffix_title?: string | null;
   gender: Gender;
-  birth_date?: string;
+  birth_date?: string | null;
   birth_date_precision?: DatePrecision;
-  birth_place?: string;
-  death_date?: string;
+  birth_place?: string | null;
+  death_date?: string | null;
   death_date_precision?: DatePrecision;
-  death_place?: string;
+  death_place?: string | null;
   life_status: LifeStatus;
-  biography?: string;
-  occupation?: string;
-  education?: string;
-  notes?: string;
+  biography?: string | null;
+  occupation?: string | null;
+  education?: string | null;
+  notes?: string | null;
   portrait_media_id?: string | null;
   visibility: Visibility;
 }

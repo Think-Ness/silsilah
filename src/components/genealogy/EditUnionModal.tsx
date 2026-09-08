@@ -52,6 +52,7 @@ export function EditUnionModal({
   const p1Name = p1 ? [p1.prefix_title, p1.display_name || p1.full_name, p1.suffix_title].filter(Boolean).join(" ") : "Pasangan 1";
   const p2Name = p2 ? [p2.prefix_title, p2.display_name || p2.full_name, p2.suffix_title].filter(Boolean).join(" ") : "Pasangan 2";
   const p1Portrait = p1?.portrait ? getMediaUrl(p1.portrait.storage_path) : null;
+  const p2Portrait = p2?.portrait ? getMediaUrl(p2.portrait.storage_path) : null;
   const p1Deceased = p1 ? (p1.life_status === "deceased" || !!p1.death_date) : false;
   const p2Deceased = p2 ? (p2.life_status === "deceased" || !!p2.death_date) : false;
   const isAutoWidowed = (p1Deceased || p2Deceased) && !(p1Deceased && p2Deceased);
