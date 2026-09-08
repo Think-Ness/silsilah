@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const quickActions = [
-    { href: "/tree", label: "Buka Pohon Keluarga", icon: GitBranch, primary: true },
+    { href: "/tree", label: "Buka Silsilah", icon: GitBranch, primary: true },
     { href: "/people/new", label: "Tambah Anggota", icon: Plus, primary: false },
     { href: "/relationships/new", label: "Tambah Hubungan", icon: Network, primary: false },
     { href: "/archive/photos", label: "Lihat Arsip Foto", icon: Image, primary: false },

@@ -30,7 +30,7 @@ const navGroups = [
     items: [
       {
         href: "/tree",
-        label: "Pohon Keluarga",
+        label: "Silsilah",
         icon: GitBranch,
       },
       {
@@ -90,12 +90,12 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="px-5 py-4 border-b border-[var(--border)]">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div
-            className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
-            style={{ background: "var(--accent-color)" }}
-          >
-            <GitBranch className="w-4 h-4 text-white" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon.png"
+            alt="Logo Silsilah"
+            className="w-7 h-7 rounded-md object-cover shadow-sm flex-shrink-0"
+          />
           <div>
             <div className="text-[13px] font-600 leading-tight text-[var(--foreground)]">
               Silsilah Keluarga

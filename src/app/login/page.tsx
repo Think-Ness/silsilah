@@ -48,19 +48,22 @@ export default function LoginPage() {
         <div style={{ textAlign: "center", marginBottom: "36px" }}>
           <div
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: "var(--radius-md)",
-              background: "var(--accent-color)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              width: 56,
+              height: 56,
+              borderRadius: "14px",
+              overflow: "hidden",
               margin: "0 auto 16px",
+              boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
             }}
           >
-            <GitBranch className="w-6 h-6 text-white" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icon.png"
+              alt="Logo Silsilah"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, color: "var(--foreground)", margin: "0 0 4px" }}>
+          <h1 style={{ fontSize: "22px", fontWeight: 600, color: "var(--foreground)", marginBottom: "6px" }}>
             Silsilah Keluarga
           </h1>
           <p style={{ fontSize: "13px", color: "var(--muted)", margin: 0 }}>

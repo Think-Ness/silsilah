@@ -5,7 +5,7 @@ import Link from "next/link";
 import { GitBranch, Users, Search, Image, MoreHorizontal } from "lucide-react";
 
 const navItems = [
-  { href: "/tree", label: "Pohon", icon: GitBranch },
+  { href: "/tree", label: "Silsilah", icon: GitBranch },
   { href: "/people", label: "Anggota", icon: Users },
   { href: "/search", label: "Cari", icon: Search },
   { href: "/archive/photos", label: "Arsip", icon: Image },

@@ -470,11 +470,11 @@
 }
 
 /* ============================================================
-   CANVAS CONTROLS
+   CANVAS CONTROLS & MINIMAP
    ============================================================ */
 .canvas-controls {
   position: absolute;
-  bottom: 24px;
+  bottom: 20px;
   right: 24px;
   display: flex;
   align-items: center;
@@ -485,6 +485,30 @@
   padding: 4px;
   z-index: 10;
   box-shadow: var(--shadow-dropdown);
+}
+
+/* Desktop: MiniMap diposisikan di atas tombol kontrol tanpa bertumpukan */
+.react-flow__minimap {
+  bottom: 74px !important;
+  right: 24px !important;
+  margin: 0 !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Mobile & Tablet (< 1024px): Sembunyikan MiniMap agar tidak mengganggu layar sempit,
+   dan posisikan tombol kontrol di atas mobile bottom-nav */
+@media (max-width: 1023px) {
+  .react-flow__minimap {
+    display: none !important;
+  }
+
+  .canvas-controls {
+    bottom: 80px;
+    right: 16px;
+  }
 }
 
 .canvas-control-btn {
