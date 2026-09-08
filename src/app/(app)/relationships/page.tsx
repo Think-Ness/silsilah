@@ -1,9 +1,8 @@
-import { getAllUnions } from "@/lib/genealogy/relationships";
-import { getAllParentChildRelationships } from "@/lib/genealogy/relationships";
+import { getAllUnions, getAllParentChildRelationships, getUnionMortalityInfo } from "@/lib/genealogy/relationships";
 import { getAllPeople } from "@/lib/genealogy/people";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, HeartHandshake } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -120,40 +119,37 @@ export default async function RelationshipsPage() {
                       </td>
                       <td style={{ fontSize: "13px" }}>
                         {(() => {
-                          const p1Deceased = p1?.life_status === "deceased" || !!p1?.death_date;
-                          const p2Deceased = p2?.life_status === "deceased" || !!p2?.death_date;
-                          const isAutoWidowed = (p1Deceased || p2Deceased) && !(p1Deceased && p2Deceased);
-                          const isBothDeceased = p1Deceased && p2Deceased;
+                          const info = getUnionMortalityInfo([p1, p2], union);
 
-                          let label = union.status === "active" ? "Aktif" : union.status === "ended" ? "Berakhir" : union.status === "divorced" ? "Cerai" : "—";
-                          let bg = union.status === "active" ? "#DCFCE7" : "var(--subtle)";
-                          let color = union.status === "active" ? "#166534" : "var(--muted)";
+                          let bg = "#DCFCE7";
+                          let color = "#166534";
 
-                          if (union.status !== "divorced" && union.status !== "ended") {
-                            if (isAutoWidowed) {
-                              label = "Duda / Janda";
-                              bg = "#F3E8FF";
-                              color = "#7E22CE";
-                            } else if (isBothDeceased) {
-                              label = "Keduanya Wafat";
-                              bg = "var(--subtle)";
-                              color = "var(--muted)";
-                            }
+                          if (info.isDivorced) {
+                            bg = "#FEE2E2";
+                            color = "#DC2626";
+                          } else if (info.isOneDeceased) {
+                            bg = "#F3E8FF";
+                            color = "#7E22CE";
+                          } else if (info.isBothDeceased) {
+                            bg = "#F4F4F5";
+                            color = "#52525B";
                           }
 
                           return (
                             <span
+                              title={info.doaText ? `${info.statusLabel}\nDoa: ${info.doaText}` : info.statusLabel}
                               style={{
                                 display: "inline-block",
-                                padding: "2px 8px",
+                                padding: "3px 8px",
                                 borderRadius: "4px",
                                 fontSize: "11px",
                                 fontWeight: 500,
                                 background: bg,
                                 color: color,
+                                cursor: "help",
                               }}
                             >
-                              {label}
+                              {info.statusLabel}
                             </span>
                           );
                         })()}

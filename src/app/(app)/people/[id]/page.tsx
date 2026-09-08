@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, User, MapPin, Phone, BookOpen, GraduationCap, Briefcase } from "lucide-react";
+import { ArrowLeft, Pencil, User, MapPin, Phone, BookOpen, GraduationCap, Briefcase, HeartHandshake } from "lucide-react";
 import { getPersonProfile } from "@/lib/genealogy/people";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { getUnionMortalityInfo } from "@/lib/genealogy/relationships";
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
 import { PersonChildrenList } from "@/components/people/PersonChildrenList";
 import type { PersonProfile } from "@/types/genealogy";
@@ -198,33 +199,82 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
 
           {profile.spouses.length > 0 && (
             <div>
-              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "4px" }}>Pasangan</div>
-              {profile.spouses.map(({ person, union }) => {
-                const isSpouseDeceased = person.life_status === "deceased" || !!person.death_date;
-                const isSelfDeceased = profile.life_status === "deceased" || !!profile.death_date;
-                let statusText = union.relationship_type === "marriage" ? "Menikah" : union.relationship_type;
-                if (union.status === "divorced") {
-                  statusText = "Bercerai";
-                } else if (union.status === "ended") {
-                  statusText = "Telah Berakhir";
-                } else if (isSpouseDeceased && !isSelfDeceased) {
-                  statusText = profile.gender === "female" ? "Janda (Pasangan Wafat)" : "Duda (Pasangan Wafat)";
-                } else if (isSpouseDeceased && isSelfDeceased) {
-                  statusText = "Menikah (Keduanya Telah Wafat)";
-                }
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "6px" }}>Pasangan & Hubungan</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {profile.spouses.map(({ person, union }) => {
+                  const info = getUnionMortalityInfo([profile, person], union);
+                  const isSpouseDeceased = person.life_status === "deceased" || !!person.death_date;
+                  const isSelfDeceased = profile.life_status === "deceased" || !!profile.death_date;
 
-                return (
-                  <div key={person.id} style={{ fontSize: "14px", color: "var(--foreground)", marginBottom: "4px" }}>
-                    <Link href={`/people/${person.id}`} style={{ color: "var(--accent-color)", textDecoration: "none" }}>
-                      {getDisplayName(person)}
-                    </Link>
-                    <span style={{ fontSize: "12px", color: "var(--muted)", marginLeft: "6px" }}>
-                      ({statusText}
-                      {union.start_date ? ` · Sejak ${union.start_date}` : ""})
-                    </span>
-                  </div>
-                );
-              })}
+                  // Tentukan status spesifik orang ini terhadap pasangannya
+                  let personalStatusLabel = "Menikah";
+                  if (union.status === "divorced") {
+                    personalStatusLabel = "Bercerai";
+                  } else if (union.status === "ended") {
+                    personalStatusLabel = "Berakhir / Pisah";
+                  } else if (isSpouseDeceased && !isSelfDeceased) {
+                    personalStatusLabel = profile.gender === "female" ? "Janda (Suami Wafat)" : profile.gender === "male" ? "Duda (Istri Wafat)" : "Duda / Janda";
+                  } else if (isSpouseDeceased && isSelfDeceased) {
+                    personalStatusLabel = "Keduanya Telah Wafat (Rahimahumallah)";
+                  }
+
+                  return (
+                    <div
+                      key={person.id}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "var(--radius-md)",
+                        background: "var(--subtle)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <HeartHandshake className={`w-4 h-4 ${isSpouseDeceased ? "text-purple-600" : "text-rose-600"}`} />
+                          <Link href={`/people/${person.id}`} style={{ fontWeight: 600, color: "var(--accent-color)", textDecoration: "none" }}>
+                            {getDisplayName(person)}
+                          </Link>
+                          {person.life_status === "deceased" && (
+                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Alm.)</span>
+                          )}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 500,
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            background: info.isOneDeceased ? "#F3E8FF" : info.isBothDeceased ? "#F4F4F5" : info.isDivorced ? "#FEE2E2" : "#FFE4E6",
+                            color: info.isOneDeceased ? "#7E22CE" : info.isBothDeceased ? "#52525B" : info.isDivorced ? "#DC2626" : "#E11D48",
+                          }}
+                        >
+                          {personalStatusLabel}
+                          {union.start_date ? ` · Sejak ${union.start_date}` : ""}
+                        </span>
+                      </div>
+
+                      {/* Kotak Doa & Pesan Kebaikan (jika salah satu/keduanya wafat) */}
+                      {(info.isOneDeceased || info.isBothDeceased) && (
+                        <div
+                          style={{
+                            marginTop: "8px",
+                            padding: "8px 10px",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            lineHeight: 1.5,
+                            fontStyle: "italic",
+                            background: info.isBothDeceased ? "rgba(244, 244, 245, 0.6)" : "rgba(243, 232, 255, 0.6)",
+                            color: info.isBothDeceased ? "#3F3F46" : "#581C87",
+                            border: `1px solid ${info.isBothDeceased ? "rgba(212, 212, 216, 0.8)" : "rgba(233, 213, 255, 0.8)"}`,
+                          }}
+                        >
+                          🕊️ &ldquo;{info.doaText}&rdquo;
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

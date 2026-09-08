@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { HeartHandshake, Loader2, Trash2, X, Calendar, FileText } from "lucide-react";
-import { updateUnion, deleteUnion } from "@/lib/genealogy/relationships";
+import { updateUnion, deleteUnion, getUnionMortalityInfo } from "@/lib/genealogy/relationships";
 import type { Union, UnionRelationshipType, UnionStatus, DatePrecision, PersonWithPortrait } from "@/types/genealogy";
 import { useQueryClient } from "@tanstack/react-query";
 import { getMediaUrl } from "@/lib/genealogy/media";
@@ -53,9 +53,8 @@ export function EditUnionModal({
   const p2Name = p2 ? [p2.prefix_title, p2.display_name || p2.full_name, p2.suffix_title].filter(Boolean).join(" ") : "Pasangan 2";
   const p1Portrait = p1?.portrait ? getMediaUrl(p1.portrait.storage_path) : null;
   const p2Portrait = p2?.portrait ? getMediaUrl(p2.portrait.storage_path) : null;
-  const p1Deceased = p1 ? (p1.life_status === "deceased" || !!p1.death_date) : false;
-  const p2Deceased = p2 ? (p2.life_status === "deceased" || !!p2.death_date) : false;
-  const isAutoWidowed = (p1Deceased || p2Deceased) && !(p1Deceased && p2Deceased);
+  
+  const mortalityInfo = getUnionMortalityInfo(members, union);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,16 +231,35 @@ export function EditUnionModal({
             </div>
           </div>
 
-          {/* Auto Duda/Janda Notification */}
-          {isAutoWidowed && (
-            <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2">
-              <span className="text-sm">ℹ️</span>
-              <div>
-                <span className="font-bold">Status Duda / Janda Terdeteksi Otomatis:</span>
-                <p className="mt-0.5 opacity-90 leading-relaxed">
-                  Sistem otomatis mengenali status {p1Deceased ? `${p2Name} sebagai Duda/Janda karena ${p1Name}` : `${p1Name} sebagai Duda/Janda karena ${p2Name}`} telah tercatat wafat pada data profilnya.
-                </p>
+          {/* Notifikasi Otomatis Status Duda / Janda Beserta Doa */}
+          {mortalityInfo.isOneDeceased && (
+            <div className="p-3.5 rounded-xl bg-purple-50/90 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 text-xs text-purple-950 dark:text-purple-100 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-purple-900 dark:text-purple-200">
+                <span className="text-sm">🕊️</span>
+                <span>Status Terdeteksi: {mortalityInfo.statusLabel}</span>
+                <span className="ml-auto px-2 py-0.5 rounded-md bg-purple-200 dark:bg-purple-900/60 text-[10px] font-semibold text-purple-800 dark:text-purple-300">
+                  {mortalityInfo.shortDoa}
+                </span>
               </div>
+              <p className="mt-1.5 text-purple-800/90 dark:text-purple-200/90 leading-relaxed italic bg-purple-100/60 dark:bg-purple-900/30 p-2.5 rounded-lg border border-purple-200/60 dark:border-purple-800/40">
+                &ldquo;{mortalityInfo.doaText}&rdquo;
+              </p>
+            </div>
+          )}
+
+          {/* Notifikasi Jika Keduanya Telah Wafat */}
+          {mortalityInfo.isBothDeceased && (
+            <div className="p-3.5 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-zinc-800 dark:text-zinc-200">
+                <span className="text-sm">🕊️</span>
+                <span>Keduanya Telah Berpulang ke Rahmatullah</span>
+                <span className="ml-auto px-2 py-0.5 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  {mortalityInfo.shortDoa}
+                </span>
+              </div>
+              <p className="mt-1.5 text-zinc-700 dark:text-zinc-300 leading-relaxed italic bg-zinc-200/50 dark:bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-300/60 dark:border-zinc-700/50">
+                &ldquo;{mortalityInfo.doaText}&rdquo;
+              </p>
             </div>
           )}
 

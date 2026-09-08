@@ -9,7 +9,115 @@ import type {
   ParentChildRelationship,
   CreateUnionInput,
   CreateParentChildInput,
+  PersonWithPortrait,
 } from "@/types/genealogy";
+
+export interface UnionMortalityInfo {
+  isDivorced: boolean;
+  isBothDeceased: boolean;
+  isOneDeceased: boolean;
+  statusLabel: string;
+  statusBadgeColor: "rose" | "purple" | "red" | "zinc";
+  survivingPartner?: PersonWithPortrait | null;
+  deceasedPartner?: PersonWithPortrait | null;
+  survivingTitle?: string;
+  deceasedTitle?: string;
+  doaText: string;
+  shortDoa: string;
+}
+
+/** Hitung status ikatan perkawinan dan doa berdasarkan vitalitas / wafatnya pasangan */
+export function getUnionMortalityInfo(
+  members: Array<PersonWithPortrait | null | undefined>,
+  union?: Partial<Union> | null
+): UnionMortalityInfo {
+  const isDivorced = union?.status === "divorced" || union?.status === "ended";
+  const [p1, p2] = members;
+
+  const p1Deceased = p1 ? (p1.life_status === "deceased" || !!p1.death_date) : false;
+  const p2Deceased = p2 ? (p2.life_status === "deceased" || !!p2.death_date) : false;
+  const isBothDeceased = p1Deceased && p2Deceased;
+  const isOneDeceased = (p1Deceased || p2Deceased) && !isBothDeceased;
+
+  if (isDivorced) {
+    return {
+      isDivorced: true,
+      isBothDeceased,
+      isOneDeceased,
+      statusLabel: union?.status === "ended" ? "Berakhir / Pisah" : "Bercerai",
+      statusBadgeColor: "red",
+      doaText: "Semoga silaturahmi dan kebaikan senantiasa terjaga.",
+      shortDoa: "",
+    };
+  }
+
+  if (isBothDeceased) {
+    return {
+      isDivorced: false,
+      isBothDeceased: true,
+      isOneDeceased: false,
+      statusLabel: "Keduanya Telah Wafat",
+      statusBadgeColor: "zinc",
+      doaText: "Semoga Allah SWT merahmati, mengampuni dosa-dosa keduanya, meluaskan kuburnya, dan mempertemukan mereka kembali di surga Firdaus-Nya. Aamiin.",
+      shortDoa: "Rahimahumallah",
+    };
+  }
+
+  if (isOneDeceased) {
+    const deceased = p1Deceased ? p1 : p2;
+    const survivor = p1Deceased ? p2 : p1;
+
+    const deceasedName = deceased
+      ? [deceased.prefix_title, deceased.display_name || deceased.full_name, deceased.suffix_title].filter(Boolean).join(" ")
+      : "Pasangan";
+    const survivorName = survivor
+      ? [survivor.prefix_title, survivor.display_name || survivor.full_name, survivor.suffix_title].filter(Boolean).join(" ")
+      : "Pasangan";
+
+    let survivingTitle = "Duda / Janda";
+    let deceasedTitle = "Almarhum / Almarhumah";
+    let shortDoa = "Rahimahullah / Rahimahallah";
+    let statusLabel = "Pasangan Wafat";
+
+    if (survivor?.gender === "male" || deceased?.gender === "female") {
+      survivingTitle = "Duda";
+      deceasedTitle = "Almarhumah Istri";
+      statusLabel = "Duda (Istri Wafat)";
+      shortDoa = "Rahimahallah";
+    } else if (survivor?.gender === "female" || deceased?.gender === "male") {
+      survivingTitle = "Janda";
+      deceasedTitle = "Almarhum Suami";
+      statusLabel = "Janda (Suami Wafat)";
+      shortDoa = "Rahimahullah";
+    }
+
+    const doaText = `Semoga ${deceasedTitle} (${deceasedName}) diampuni segala dosanya, diterima segala amal ibadahnya, serta ditempatkan di surga terbaik di sisi Allah SWT. Dan semoga ${survivorName} (${survivingTitle}) senantiasa diberi ketabahan, kekuatan, dan keberkahan hidup. Aamiin.`;
+
+    return {
+      isDivorced: false,
+      isBothDeceased: false,
+      isOneDeceased: true,
+      statusLabel,
+      statusBadgeColor: "purple",
+      survivingPartner: survivor,
+      deceasedPartner: deceased,
+      survivingTitle,
+      deceasedTitle,
+      doaText,
+      shortDoa,
+    };
+  }
+
+  return {
+    isDivorced: false,
+    isBothDeceased: false,
+    isOneDeceased: false,
+    statusLabel: "Menikah (Aktif)",
+    statusBadgeColor: "rose",
+    doaText: "Semoga senantiasa menjadi keluarga yang sakinah, mawaddah, warahmah, serta penuh keberkahan.",
+    shortDoa: "Sakinah Mawaddah Warahmah",
+  };
+}
 
 const supabase = createClient();
 

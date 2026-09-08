@@ -8,6 +8,7 @@ import type {
   ParentChildRelationship,
 } from "@/types/genealogy";
 import { User, Printer, Pencil, Check, ZoomIn, ZoomOut, Maximize2, RotateCcw, HeartHandshake } from "lucide-react";
+import { getUnionMortalityInfo } from "@/lib/genealogy/relationships";
 
 interface ZuriatChartViewProps {
   people: PersonWithPortrait[];
@@ -820,22 +821,32 @@ export function ZuriatChartView({
           </button>
 
           {/* Simbol Pernikahan */}
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
-              background: "#FFF1F2",
-              border: "2px solid #E11D48",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-            }}
-            title="Pernikahan Suami Istri"
-          >
-            <HeartHandshake className="w-5 h-5 text-rose-600" />
-          </div>
+          {(() => {
+            const info = getUnionMortalityInfo([mainPerson, mainSpouse]);
+            const badgeBg = info.isOneDeceased ? "#FAF5FF" : info.isBothDeceased ? "#F4F4F5" : "#FFF1F2";
+            const badgeBorder = info.isOneDeceased ? "#9333EA" : info.isBothDeceased ? "#71717A" : "#E11D48";
+            const iconColor = info.isOneDeceased ? "text-purple-600" : info.isBothDeceased ? "text-zinc-600" : "text-rose-600";
+
+            return (
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  background: badgeBg,
+                  border: `2px solid ${badgeBorder}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+                  cursor: "help",
+                }}
+                title={`Pernikahan: ${info.statusLabel}\n${info.doaText}`}
+              >
+                <HeartHandshake className={`w-5 h-5 ${iconColor}`} />
+              </div>
+            );
+          })()}
 
           {/* Pasangan */}
           {mainSpouse && (
