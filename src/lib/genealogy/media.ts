@@ -16,14 +16,21 @@ export async function uploadMedia(
   options?: {
     title?: string;
     description?: string;
+    mediaType?: "photo" | "document" | "video" | "other";
+    takenAt?: string;
+    personId?: string;
+    role?: PersonMediaRole;
+    isPrimaryPortrait?: boolean;
   }
 ): Promise<Media> {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Generate unique path
-  const fileExt = file.name.split(".").pop();
+  const fileExt = file.name.split(".").pop() || "bin";
+  const detectedType = options?.mediaType || (file.type.startsWith("image/") ? "photo" : "document");
+  const folder = detectedType === "document" ? "documents" : "uploads";
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-  const storagePath = `uploads/${fileName}`;
+  const storagePath = `${folder}/${fileName}`;
 
   // 1. Upload ke Storage
   const { error: uploadError } = await supabase.storage
@@ -43,9 +50,10 @@ export async function uploadMedia(
       description: options?.description,
       storage_path: storagePath,
       storage_bucket: BUCKET,
-      media_type: file.type.startsWith("image/") ? "photo" : "document",
-      mime_type: file.type,
+      media_type: detectedType,
+      mime_type: file.type || (detectedType === "photo" ? "image/jpeg" : "application/octet-stream"),
       file_size_bytes: file.size,
+      taken_at: options?.takenAt || null,
       uploaded_by: user?.id,
       visibility: "family",
     })
@@ -53,7 +61,19 @@ export async function uploadMedia(
     .single();
 
   if (error) throw error;
-  return data as Media;
+  const media = data as Media;
+
+  // 3. Link ke person jika ada personId
+  if (options?.personId) {
+    await linkMediaToPerson(
+      options.personId,
+      media.id,
+      options.role || (detectedType === "document" ? "document" : "other"),
+      options.isPrimaryPortrait || false
+    );
+  }
+
+  return media;
 }
 
 /** Link media ke person */
@@ -135,15 +155,83 @@ export async function getAllMedia(
   return (data as Media[]) || [];
 }
 
+export interface MediaWithPerson extends Media {
+  person_media?: Array<{
+    id?: string;
+    person_id?: string;
+    media_id?: string;
+    role: PersonMediaRole;
+    is_primary_portrait: boolean;
+    created_at?: string;
+    person?: {
+      id: string;
+      full_name: string;
+      display_name?: string | null;
+      gender?: string | null;
+    } | null;
+  }>;
+}
+
+/** Ambil semua media dengan relasi person */
+export async function getAllMediaWithPeople(
+  options?: {
+    media_type?: string;
+    limit?: number;
+    offset?: number;
+  },
+  client?: any
+): Promise<MediaWithPerson[]> {
+  const sb = getClient(client);
+  try {
+    let query = sb
+      .from("media")
+      .select(`
+        *,
+        person_media (
+          role,
+          is_primary_portrait,
+          person:people (
+            id,
+            full_name,
+            display_name,
+            gender
+          )
+        )
+      `)
+      .order("created_at", { ascending: false });
+
+    if (options?.media_type) query = query.eq("media_type", options.media_type);
+    if (options?.limit) query = query.limit(options.limit);
+    if (options?.offset) query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("getAllMediaWithPeople joined query error, fallback to simple select:", error);
+      return (await getAllMedia(options, client)) as MediaWithPerson[];
+    }
+    return (data as MediaWithPerson[]) || [];
+  } catch (err) {
+    console.error("Error in getAllMediaWithPeople:", err);
+    return (await getAllMedia(options, client)) as MediaWithPerson[];
+  }
+}
+
 /** Hapus media (file + record) */
-export async function deleteMedia(media: Media): Promise<void> {
+export async function deleteMedia(media: Media | { id: string; storage_path: string }): Promise<void> {
   const supabase = createClient();
-  // 1. Hapus dari storage
-  await supabase.storage.from(BUCKET).remove([media.storage_path]);
+  // 1. Hapus dari storage jika ada storage_path
+  if (media.storage_path) {
+    await supabase.storage.from(BUCKET).remove([media.storage_path]);
+  }
 
   // 2. Hapus record
   const { error } = await supabase.from("media").delete().eq("id", media.id);
   if (error) throw error;
+}
+
+/** Hapus media berdasarkan ID dan storage path */
+export async function deleteMediaById(id: string, storagePath: string): Promise<void> {
+  return deleteMedia({ id, storage_path: storagePath });
 }
 
 /** Stats */

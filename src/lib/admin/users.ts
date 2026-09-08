@@ -370,17 +370,150 @@ export async function reviewPendingChange(
 
 export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = await createClient();
+  const { profile } = await getOrBootstrapUserProfile(supabase);
+  return profile;
+}
+
+/**
+ * Ensures the logged-in user has a profile and has appropriate role.
+ * - If profiles table is not created yet, reports TABLE_NOT_FOUND.
+ * - If no super_admin exists in profiles, or if this user is the only user, promotes them to super_admin.
+ * - If profile does not exist yet for user, creates it with super_admin (if first) or family_member.
+ */
+export async function getOrBootstrapUserProfile(supabaseClient?: any): Promise<{
+  profile: Profile | null;
+  user: any;
+  error: string | null;
+}> {
+  const supabase = supabaseClient || (await createClient());
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { profile: null, user: null, error: "Unauthenticated" };
+  }
+
+  try {
+    // 1. Try to read current profile
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileErr) {
+      if (profileErr.code === "42P01" || profileErr.message?.includes("does not exist")) {
+        return { profile: null, user, error: "TABLE_NOT_FOUND" };
+      }
+    }
+
+    if (profile) {
+      // If user is already super_admin, return
+      if (profile.role === "super_admin") {
+        return { profile: { ...profile, email: user.email } as Profile, user, error: null };
+      }
+
+      // If user is not super_admin, check if ANY active super_admin exists in profiles
+      const { count: superAdminCount } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "super_admin");
+
+      if (!superAdminCount || superAdminCount === 0) {
+        // No super_admin in the system! Promote current user to super_admin
+        const { data: updatedProfile } = await supabase
+          .from("profiles")
+          .update({ role: "super_admin", updated_at: new Date().toISOString() })
+          .eq("id", user.id)
+          .select()
+          .single();
+
+        return {
+          profile: ({ ...(updatedProfile || profile), role: "super_admin", email: user.email }) as Profile,
+          user,
+          error: null,
+        };
+      }
+
+      return { profile: { ...profile, email: user.email } as Profile, user, error: null };
+    }
+
+    // 2. Profile doesn't exist yet: bootstrap new profile
+    const { count: totalProfiles } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true });
+
+    const isFirstUser = !totalProfiles || totalProfiles === 0;
+
+    const { count: superAdminCount } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "super_admin");
+
+    const roleToAssign: UserRole =
+      isFirstUser || !superAdminCount || superAdminCount === 0
+        ? "super_admin"
+        : ((user.user_metadata?.role as UserRole) || "family_member");
+
+    const newProfileData = {
+      id: user.id,
+      full_name:
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "Pengguna",
+      avatar_url: user.user_metadata?.avatar_url || null,
+      role: roleToAssign,
+      is_active: true,
+    };
+
+    const { data: createdProfile, error: insertErr } = await supabase
+      .from("profiles")
+      .upsert(newProfileData)
+      .select()
+      .single();
+
+    if (insertErr) {
+      console.warn("Bootstrap upsert profile returned error:", insertErr);
+    }
+
+    return {
+      profile: {
+        ...(createdProfile || newProfileData),
+        email: user.email,
+        created_at: createdProfile?.created_at || new Date().toISOString(),
+        updated_at: createdProfile?.updated_at || new Date().toISOString(),
+      } as Profile,
+      user,
+      error: null,
+    };
+  } catch (err: any) {
+    console.error("Error in getOrBootstrapUserProfile:", err);
+    return { profile: null, user, error: err?.message || "Unknown error" };
+  }
+}
+
+/** Explicitly promote current user to super_admin (for first-time owner setup) */
+export async function claimSuperAdminRole(): Promise<{ error: string | null }> {
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { error: "Tidak terautentikasi" };
 
-  const { data } = await supabase
+  const { error } = await supabase
     .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+    .upsert({
+      id: user.id,
+      full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin",
+      role: "super_admin",
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    });
 
-  if (!data) return null;
-  return { ...data, email: user.email } as Profile;
+  if (error) return { error: error.message };
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/approvals");
+  return { error: null };
 }

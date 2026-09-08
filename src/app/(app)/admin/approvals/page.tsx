@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { listPendingChanges } from "@/lib/admin/users";
+import { listPendingChanges, getOrBootstrapUserProfile, claimSuperAdminRole } from "@/lib/admin/users";
 import { ApprovalsClient } from "./ApprovalsClient";
+import Link from "next/link";
+import { ShieldAlert, Database, ArrowLeft, ShieldCheck } from "lucide-react";
 
 export const metadata = {
   title: "Persetujuan Perubahan | Silsilah Keluarga",
@@ -9,20 +11,116 @@ export const metadata = {
 
 export default async function AdminApprovalsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { profile: myProfile, user, error: bootstrapErr } = await getOrBootstrapUserProfile(supabase);
 
   if (!user) redirect("/login");
 
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  // Jika tabel database belum siap
+  if (bootstrapErr === "TABLE_NOT_FOUND") {
+    return (
+      <div className="page-content" style={{ maxWidth: 640, margin: "60px auto" }}>
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+            padding: "32px",
+            textAlign: "center",
+          }}
+        >
+          <Database className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--foreground)", marginBottom: "8px" }}>
+            Tabel Database Persetujuan Belum Siap
+          </h2>
+          <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: 1.6, marginBottom: "20px" }}>
+            Fitur Persetujuan Perubahan memerlukan tabel <code>pending_changes</code>. Silakan jalankan file migrasi{" "}
+            <code>supabase/migrations/010_pending_changes.sql</code> melalui Supabase SQL Editor.
+          </p>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+            <Link
+              href="/"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 16px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+                textDecoration: "none",
+                fontSize: "13px",
+              }}
+            >
+              <ArrowLeft className="w-4 h-4" /> Kembali ke Ringkasan
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  if (!myProfile || myProfile.role !== "super_admin") {
-    redirect("/");
+  // Hanya super_admin dan family_member yang dapat melihat approval
+  if (!myProfile || (myProfile.role !== "super_admin" && myProfile.role !== "family_member")) {
+    return (
+      <div className="page-content" style={{ maxWidth: 600, margin: "60px auto" }}>
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+            padding: "32px",
+            textAlign: "center",
+          }}
+        >
+          <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--foreground)", marginBottom: "8px" }}>
+            Akses Terbatas: Persetujuan
+          </h2>
+          <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: 1.6, marginBottom: "20px" }}>
+            Halaman persetujuan memerlukan hak akses Anggota Keluarga atau Super Admin. Anda saat ini memiliki peran{" "}
+            <strong>{myProfile?.role || "viewer"}</strong>.
+          </p>
+          <form
+            action={async () => {
+              "use server";
+              await claimSuperAdminRole();
+            }}
+          >
+            <button
+              type="submit"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 20px",
+                borderRadius: "var(--radius-md)",
+                background: "var(--primary-color)",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "16px",
+              }}
+            >
+              <ShieldCheck className="w-4 h-4" /> Aktifkan Hak Super Admin untuk Akun Ini
+            </button>
+          </form>
+          <div>
+            <Link
+              href="/"
+              style={{
+                fontSize: "13px",
+                color: "var(--muted)",
+                textDecoration: "underline",
+              }}
+            >
+              Kembali ke Ringkasan
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const [
