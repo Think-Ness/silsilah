@@ -39,6 +39,8 @@ export const PERSON_NODE_WIDTH = 240;
 export const PERSON_NODE_HEIGHT = 115;
 const COUPLE_GAP = 90;
 const SIBLING_GAP = 90;
+const SPOUSE_STACK_GAP = 28;
+const BESAN_GAP = 140;
 const GENERATION_HEIGHT = 280;
 const UNION_NODE_SIZE = 28;
 
@@ -356,8 +358,11 @@ export function calculateFamilyTreePositions(
     if (visited.has(unit.id)) return unit.subtreeWidth;
     visited.add(unit.id);
 
+    // Multi-spouse stacked di kolom kanan: lebar kartu = suami + gap + istri
     const selfWidth =
-      PERSON_NODE_WIDTH + unit.spouses.length * (PERSON_NODE_WIDTH + COUPLE_GAP);
+      unit.spouses.length > 0
+        ? PERSON_NODE_WIDTH + COUPLE_GAP + PERSON_NODE_WIDTH
+        : PERSON_NODE_WIDTH;
 
     if (unit.childUnitIds.length === 0) {
       unit.subtreeWidth = selfWidth;
@@ -392,31 +397,40 @@ export function calculateFamilyTreePositions(
     visited.add(unit.id);
 
     const selfWidth =
-      PERSON_NODE_WIDTH + unit.spouses.length * (PERSON_NODE_WIDTH + COUPLE_GAP);
+      unit.spouses.length > 0
+        ? PERSON_NODE_WIDTH + COUPLE_GAP + PERSON_NODE_WIDTH
+        : PERSON_NODE_WIDTH;
+
+    const unitHeight =
+      Math.max(1, unit.spouses.length) * (PERSON_NODE_HEIGHT + SPOUSE_STACK_GAP) -
+      SPOUSE_STACK_GAP;
+
+    unit.x = startX;
+    unit.y = baseY;
 
     const cardX = startX + (unit.subtreeWidth - selfWidth) / 2;
     const cardY = baseY;
 
-    // Tempatkan Primary Person
+    // Tempatkan Primary Person (Suami di kolom kiri)
     positions.set(`person-${unit.primaryPerson.id}`, { x: cardX, y: cardY });
 
-    // Tempatkan setiap pasangan (Istri 1, Istri 2, dst) beserta simpul nikahnya
+    // Tempatkan setiap pasangan (Istri 1, Istri 2, dst) secara vertikal di kolom kanan
     for (let i = 0; i < unit.spouses.length; i++) {
       const spouseInfo = unit.spouses[i];
-      const sX = cardX + (i + 1) * (PERSON_NODE_WIDTH + COUPLE_GAP);
+      const sX = cardX + PERSON_NODE_WIDTH + COUPLE_GAP;
+      const sY = cardY + i * (PERSON_NODE_HEIGHT + SPOUSE_STACK_GAP);
       const uX =
         cardX +
         PERSON_NODE_WIDTH +
-        i * (PERSON_NODE_WIDTH + COUPLE_GAP) +
         COUPLE_GAP / 2 -
         UNION_NODE_SIZE / 2;
-      const uY = cardY + PERSON_NODE_HEIGHT / 2 - UNION_NODE_SIZE / 2;
+      const uY = sY + PERSON_NODE_HEIGHT / 2 - UNION_NODE_SIZE / 2;
 
-      positions.set(`person-${spouseInfo.spouse.id}`, { x: sX, y: cardY });
+      positions.set(`person-${spouseInfo.spouse.id}`, { x: sX, y: sY });
       positions.set(`union-${spouseInfo.union.id}`, { x: uX, y: uY });
     }
 
-    // Tempatkan anak-anaknya di bawah
+    // Tempatkan anak-anak di bawah unit ini (dengan jarak aman dari tumpukan istri)
     if (unit.childUnitIds.length > 0) {
       let totalChildrenWidth = 0;
       const validChildren: FamilyUnit[] = [];
@@ -431,8 +445,9 @@ export function calculateFamilyTreePositions(
       }
 
       let currentChildX = startX + (unit.subtreeWidth - totalChildrenWidth) / 2;
+      const childY = baseY + Math.max(GENERATION_HEIGHT, unitHeight + 110);
       for (const childUnit of validChildren) {
-        assignCoordinates(childUnit, currentChildX, baseY + GENERATION_HEIGHT, visited);
+        assignCoordinates(childUnit, currentChildX, childY, visited);
         currentChildX += childUnit.subtreeWidth + SIBLING_GAP;
       }
     }
@@ -448,26 +463,68 @@ export function calculateFamilyTreePositions(
     assignCoordinates(focalUnit, focalStartX, focalStartY, visitedUnits);
   }
 
-  // 7. Posisikan Orang Tua / Leluhur (Termasuk Orang Tua dari Menantu / Besan)
-  // Menempatkan orang tua tepat di atas anak/menantunya secara rapi
+  // 7. Posisikan Orang Tua / Leluhur & Besan (Anti Tabrakan dengan Gap Luas)
+  // Menempatkan orang tua tepat di atas anak dan menantunya dengan jarak renggang & simetris
   let ancestorsPlaced = true;
   while (ancestorsPlaced) {
     ancestorsPlaced = false;
-    for (const person of people) {
-      const personPos = positions.get(`person-${person.id}`);
-      if (!personPos) continue;
 
-      const pParentIds = childToParents.get(person.id) || [];
-      for (const pId of pParentIds) {
-        const parentUnitId = personToUnitId.get(pId);
-        if (parentUnitId && !visitedUnits.has(parentUnitId)) {
-          const parentUnit = unitMap.get(parentUnitId);
-          if (parentUnit) {
-            const pX = personPos.x + PERSON_NODE_WIDTH / 2 - parentUnit.subtreeWidth / 2;
-            const pY = personPos.y - GENERATION_HEIGHT;
-            assignCoordinates(parentUnit, pX, pY, visitedUnits);
-            ancestorsPlaced = true;
+    for (const unit of familyUnits) {
+      if (!visitedUnits.has(unit.id)) continue;
+
+      // Kumpulkan pasangan di unit ini yang memiliki orang tua belum terpasang
+      const membersInUnit: { person: PersonWithPortrait; isPrimary: boolean }[] = [
+        { person: unit.primaryPerson, isPrimary: true },
+        ...unit.spouses.map((s) => ({ person: s.spouse, isPrimary: false })),
+      ];
+
+      const parentUnitsToPlace: {
+        member: PersonWithPortrait;
+        parentUnit: FamilyUnit;
+      }[] = [];
+
+      for (const m of membersInUnit) {
+        const pParentIds = childToParents.get(m.person.id) || [];
+        for (const pId of pParentIds) {
+          const pUnitId = personToUnitId.get(pId);
+          if (pUnitId && !visitedUnits.has(pUnitId)) {
+            const pUnit = unitMap.get(pUnitId);
+            if (pUnit && !parentUnitsToPlace.some((item) => item.parentUnit.id === pUnit.id)) {
+              parentUnitsToPlace.push({ member: m.person, parentUnit: pUnit });
+            }
           }
+        }
+      }
+
+      if (parentUnitsToPlace.length === 0) continue;
+
+      const pY = unit.y - GENERATION_HEIGHT;
+
+      if (parentUnitsToPlace.length === 1) {
+        // Hanya 1 orang tua (misal hanya orang tua suami, atau hanya orang tua menantu)
+        const item = parentUnitsToPlace[0];
+        const memberPos = positions.get(`person-${item.member.id}`) || { x: unit.x, y: unit.y };
+        const pX = memberPos.x + PERSON_NODE_WIDTH / 2 - item.parentUnit.subtreeWidth / 2;
+        assignCoordinates(item.parentUnit, pX, pY, visitedUnits);
+        ancestorsPlaced = true;
+      } else {
+        // Lebih dari 1 pihak orang tua (misal Orang Tua Suami & Orang Tua Menantu/Besan)
+        // Hitung total lebar kedua keluarga dengan BESAN_GAP yang luas agar tidak bertumpuk
+        let totalParentWidth = 0;
+        for (let i = 0; i < parentUnitsToPlace.length; i++) {
+          totalParentWidth +=
+            parentUnitsToPlace[i].parentUnit.subtreeWidth + (i > 0 ? BESAN_GAP : 0);
+        }
+
+        const firstPos = positions.get(`person-${parentUnitsToPlace[0].member.id}`) || { x: unit.x, y: unit.y };
+        const lastPos = positions.get(`person-${parentUnitsToPlace[parentUnitsToPlace.length - 1].member.id}`) || { x: unit.x, y: unit.y };
+        const coupleMidX = (firstPos.x + lastPos.x + PERSON_NODE_WIDTH) / 2;
+
+        let curParentX = coupleMidX - totalParentWidth / 2;
+        for (const item of parentUnitsToPlace) {
+          assignCoordinates(item.parentUnit, curParentX, pY, visitedUnits);
+          curParentX += item.parentUnit.subtreeWidth + BESAN_GAP;
+          ancestorsPlaced = true;
         }
       }
     }
