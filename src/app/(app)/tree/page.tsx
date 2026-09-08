@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FamilyCanvas } from "@/components/genealogy/FamilyCanvas";
 import { ZuriatChartView } from "@/components/genealogy/ZuriatChartView";
 import { CanvasSelector } from "@/components/genealogy/CanvasSelector";
+import { CanvasDashboard } from "@/components/genealogy/CanvasDashboard";
 import { CreateCanvasModal } from "@/components/genealogy/CreateCanvasModal";
 import { QuickAddMemberModal, type QuickAddActionType } from "@/components/genealogy/QuickAddMemberModal";
 import { ReorderChildrenModal } from "@/components/genealogy/ReorderChildrenModal";
@@ -16,7 +17,7 @@ import { getAllUnions, getAllParentChildRelationships } from "@/lib/genealogy/re
 import { getAllCanvases, deleteCanvas, updateCanvas } from "@/lib/genealogy/canvases";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LayoutGrid, Network, Edit3, Check, Users, Printer } from "lucide-react";
+import { LayoutGrid, Layers, Plus, Network, Edit3, Check, Users, Printer } from "lucide-react";
 import type { Canvas } from "@/types/genealogy";
 
 const supabase = createClient();
@@ -52,8 +53,8 @@ async function getCanvasData() {
 
 export default function FamilyTreePage() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  // Default kanvas interaktif dengan zoom & drag aktif
-  const [viewMode, setViewMode] = useState<"canvas" | "zuriat">("canvas");
+  // Mode tampilan: dashboard galeri kanvas | kanvas interaktif | template bagan zuriat
+  const [viewMode, setViewMode] = useState<"dashboard" | "canvas" | "zuriat">("dashboard");
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [createCanvasModal, setCreateCanvasModal] = useState<{
     open: boolean;
@@ -265,6 +266,7 @@ export default function FamilyTreePage() {
       setActiveCanvasId(newCanvas.id);
       setFamilyTitle(newCanvas.title);
       setTitleInput(newCanvas.title);
+      setViewMode("canvas");
     },
     [queryClient]
   );
@@ -502,8 +504,19 @@ export default function FamilyTreePage() {
           gap: "10px",
         }}
       >
-        {/* Mode Switcher Buttons */}
+        {/* Left: Mode Switcher & Back to Dashboard */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {viewMode !== "dashboard" && (
+            <button
+              onClick={() => setViewMode("dashboard")}
+              title="Kembali ke Dashboard Galeri Kanvas"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>← Semua Kanvas</span>
+            </button>
+          )}
+
           <div
             style={{
               display: "inline-flex",
@@ -514,12 +527,33 @@ export default function FamilyTreePage() {
             }}
           >
             <button
+              onClick={() => setViewMode("dashboard")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 12px",
+                fontSize: "12px",
+                fontWeight: 600,
+                borderRadius: "var(--radius-xs)",
+                border: "none",
+                cursor: "pointer",
+                background: viewMode === "dashboard" ? "var(--surface)" : "transparent",
+                color: viewMode === "dashboard" ? "#059669" : "var(--muted)",
+                boxShadow: viewMode === "dashboard" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-600" />
+              Dashboard Kanvas
+            </button>
+            <button
               onClick={() => setViewMode("canvas")}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "6px 14px",
+                padding: "6px 12px",
                 fontSize: "12px",
                 fontWeight: 600,
                 borderRadius: "var(--radius-xs)",
@@ -540,7 +574,7 @@ export default function FamilyTreePage() {
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "6px 14px",
+                padding: "6px 12px",
                 fontSize: "12px",
                 fontWeight: 600,
                 borderRadius: "var(--radius-xs)",
@@ -552,8 +586,8 @@ export default function FamilyTreePage() {
                 transition: "all 0.15s ease",
               }}
             >
-              <LayoutGrid className="w-3.5 h-3.5 text-amber-600" />
-              Template Print / Bagan Zuriat
+              <Printer className="w-3.5 h-3.5 text-amber-600" />
+              Bagan Zuriat
             </button>
           </div>
 
@@ -585,78 +619,116 @@ export default function FamilyTreePage() {
           )}
         </div>
 
-        {/* Center: Canvas Selector & Editable Title */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <CanvasSelector
-            canvases={canvasesData}
-            activeCanvasId={activeCanvas?.id || null}
-            onSelectCanvas={handleSelectCanvas}
-            onCreateNewClick={() =>
-              setCreateCanvasModal({ open: true, initialRootPersonId: null })
-            }
-            onDeleteCanvas={handleDeleteCanvas}
-          />
+        {/* Center: Canvas Selector & Title */}
+        {viewMode !== "dashboard" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <CanvasSelector
+              canvases={canvasesData}
+              activeCanvasId={activeCanvas?.id || null}
+              onSelectCanvas={handleSelectCanvas}
+              onCreateNewClick={() =>
+                setCreateCanvasModal({ open: true, initialRootPersonId: null })
+              }
+              onDeleteCanvas={handleDeleteCanvas}
+            />
 
-          {isEditingTitle ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveTitleInput();
-              }}
-              style={{ display: "flex", alignItems: "center", gap: "6px" }}
-            >
-              <input
-                type="text"
-                value={titleInput}
-                onChange={(e) => setTitleInput(e.target.value)}
-                autoFocus
-                onBlur={handleSaveTitleInput}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  border: "1px solid var(--accent-color)",
-                  borderRadius: "6px",
-                  padding: "4px 10px",
-                  outline: "none",
-                  minWidth: "220px",
+            {isEditingTitle ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveTitleInput();
                 }}
-              />
-              <button
-                type="submit"
-                className="p-1 rounded hover:bg-emerald-100 text-emerald-700 transition-colors"
-                title="Simpan Judul"
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
               >
-                <Check className="w-4 h-4" />
+                <input
+                  type="text"
+                  value={titleInput}
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  autoFocus
+                  onBlur={handleSaveTitleInput}
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    border: "1px solid var(--accent-color)",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    outline: "none",
+                    minWidth: "220px",
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="p-1 rounded hover:bg-emerald-100 text-emerald-700 transition-colors"
+                  title="Simpan Judul"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => setIsEditingTitle(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="Ubah Nama Kanvas Ini"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
               </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setIsEditingTitle(true)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Ubah Nama Kanvas Ini"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              {canvasesData.length} Kanvas Silsilah Tersedia
+            </span>
+          </div>
+        )}
 
-        {/* Right Info */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--muted)" }}>
-          <Users className="w-3.5 h-3.5" />
-          <span>{data?.people?.length || 0} Anggota</span>
+        {/* Right Info / Action */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {viewMode === "dashboard" ? (
+            <button
+              onClick={() =>
+                setCreateCanvasModal({ open: true, initialRootPersonId: null })
+              }
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Buat Kanvas Baru</span>
+            </button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--muted)" }}>
+              <Users className="w-3.5 h-3.5" />
+              <span>{data?.people?.length || 0} Anggota</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main Content Area */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
         {/* View container */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex" }}>
           {isLoading ? (
             <div style={{ display: "flex", gap: "16px", padding: "32px", flexWrap: "wrap" }}>
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="w-[240px] h-[115px] rounded-lg" />
               ))}
             </div>
+          ) : viewMode === "dashboard" ? (
+            <CanvasDashboard
+              canvases={canvasesData}
+              people={data?.people || []}
+              activeCanvasId={activeCanvas?.id || null}
+              onSelectCanvas={(canvas, mode) => {
+                setActiveCanvasId(canvas.id);
+                setFamilyTitle(canvas.title);
+                setTitleInput(canvas.title);
+                setViewMode(mode || "canvas");
+              }}
+              onCreateNewClick={() =>
+                setCreateCanvasModal({ open: true, initialRootPersonId: null })
+              }
+              onDeleteCanvas={handleDeleteCanvas}
+            />
           ) : viewMode === "zuriat" ? (
             <ZuriatChartView
               people={data?.people || []}
