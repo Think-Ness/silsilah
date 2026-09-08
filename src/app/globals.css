@@ -1,0 +1,718 @@
+/* Google Font — Inter */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   DESIGN TOKENS — Family Genealogy Archive System
+   DESIGN.md §3 — Color System
+   ============================================================ */
+:root {
+  /* Base palette */
+  --background: #FAFAF9;
+  --surface: #FFFFFF;
+  --foreground: #18181B;
+  --muted: #71717A;
+  --border: #E4E4E7;
+  --subtle: #F4F4F5;
+
+  /* Accent — heritage warm */
+  --accent-color: #6B6257;
+  --accent-light: #8C7B6B;
+  --accent-subtle: #F5F1EE;
+
+  /* Status colors (hanya ketika diperlukan) */
+  --success: #16A34A;
+  --warning: #D97706;
+  --destructive: #DC2626;
+
+  /* Shadows — hanya untuk overlay elements */
+  --shadow-overlay: 0 4px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 8px -2px rgba(0, 0, 0, 0.06);
+  --shadow-dropdown: 0 4px 12px -2px rgba(0, 0, 0, 0.1), 0 2px 6px -2px rgba(0, 0, 0, 0.06);
+
+  /* Border Radius — restrained */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius: 0.5rem;  /* shadcn compat */
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 250ms ease;
+
+  /* Shadcn token mapping */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-muted: var(--subtle);
+  --color-muted-foreground: var(--muted);
+  --color-primary: var(--foreground);
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: var(--subtle);
+  --color-secondary-foreground: var(--foreground);
+  --color-accent: var(--accent-subtle);
+  --color-accent-foreground: var(--accent-color);
+  --color-destructive: var(--destructive);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--foreground);
+  --color-input: var(--border);
+  --color-ring: var(--accent-color);
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--foreground);
+  --color-sidebar-primary-foreground: var(--surface);
+  --color-sidebar-accent: var(--subtle);
+  --color-sidebar-accent-foreground: var(--foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--accent-color);
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", monospace;
+  --font-heading: var(--font-sans);
+
+  /* Radius mapping */
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.25);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-heading);
+  --color-sidebar-ring: var(--color-sidebar-ring);
+  --color-sidebar-border: var(--color-sidebar-border);
+  --color-sidebar-accent-foreground: var(--color-sidebar-accent-foreground);
+  --color-sidebar-accent: var(--color-sidebar-accent);
+  --color-sidebar-primary-foreground: var(--color-sidebar-primary-foreground);
+  --color-sidebar-primary: var(--color-sidebar-primary);
+  --color-sidebar-foreground: var(--color-sidebar-foreground);
+  --color-sidebar: var(--color-sidebar);
+  --color-ring: var(--color-ring);
+  --color-input: var(--color-input);
+  --color-border: var(--color-border);
+  --color-destructive: var(--color-destructive);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-accent: var(--color-accent);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-muted: var(--color-muted);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-primary: var(--color-primary);
+  --color-popover-foreground: var(--color-popover-foreground);
+  --color-popover: var(--color-popover);
+  --color-card-foreground: var(--color-card-foreground);
+  --color-card: var(--color-card);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  /* Focus visible */
+  :focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* ============================================================
+   GENEALOGY CANVAS
+   ============================================================ */
+.genealogy-canvas {
+  background-color: var(--background);
+  width: 100%;
+  height: 100%;
+}
+
+/* React Flow overrides */
+.react-flow {
+  background-color: var(--background);
+}
+
+.react-flow__background {
+  background-color: var(--background);
+}
+
+.react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--surface);
+}
+
+.react-flow__controls {
+  display: none; /* Kita pakai custom controls */
+}
+
+/* ============================================================
+   PERSON NODE
+   ============================================================ */
+.person-node {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  user-select: none;
+}
+
+.person-node:hover {
+  border-color: var(--accent-color);
+}
+
+.person-node.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.person-node.deceased {
+  opacity: 0.75;
+}
+
+/* ============================================================
+   LAYOUT UTILITIES
+   ============================================================ */
+.app-layout {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-sidebar {
+  width: 240px;
+  min-width: 240px;
+  height: 100%;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.app-header {
+  height: 56px;
+  min-height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+
+/* ============================================================
+   SIDEBAR NAV
+   ============================================================ */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-item:hover {
+  color: var(--foreground);
+  background-color: var(--subtle);
+}
+
+.nav-item.active {
+  color: var(--foreground);
+  background-color: var(--accent-subtle);
+}
+
+.nav-item.active .nav-icon {
+  color: var(--accent-color);
+}
+
+/* ============================================================
+   PAGE CONTENT
+   ============================================================ */
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 4px 0;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* ============================================================
+   PROFILE PANEL
+   ============================================================ */
+.profile-panel {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   STATS CARDS
+   ============================================================ */
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+}
+
+.stat-card-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-card-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--subtle);
+}
+
+.data-table td {
+  padding: 0 16px;
+  height: 64px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.data-table tr:hover td {
+  background-color: var(--subtle);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ============================================================
+   FORMS
+   ============================================================ */
+.form-section {
+  margin-bottom: 32px;
+}
+
+.form-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 4px 0;
+}
+
+.form-section-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0 20px 0;
+}
+
+/* ============================================================
+   BOTTOM NAV (Mobile)
+   ============================================================ */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  min-height: 44px;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.bottom-nav-item.active {
+  color: var(--accent-color);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1023px) {
+  .app-sidebar {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: flex;
+  }
+
+  .page-content {
+    padding: 20px 16px;
+    padding-bottom: 80px; /* space for bottom nav */
+  }
+
+  .profile-panel {
+    display: none; /* bottom sheet dipakai di mobile */
+  }
+}
+
+@media (max-width: 767px) {
+  .page-content {
+    padding: 16px;
+    padding-bottom: 80px;
+  }
+}
+
+/* ============================================================
+   CANVAS CONTROLS
+   ============================================================ */
+.canvas-controls {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  z-index: 10;
+  box-shadow: var(--shadow-dropdown);
+}
+
+.canvas-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.canvas-control-btn:hover {
+  color: var(--foreground);
+  background: var(--subtle);
+}
+
+.canvas-control-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-state-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 8px;
+}
+
+.empty-state-description {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 20px;
+  max-width: 320px;
+}
+
+/* ============================================================
+   SKELETON LOADING
+   ============================================================ */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton {
+  background: var(--subtle);
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================================
+   BADGE VARIANTS (custom)
+   ============================================================ */
+.badge-living {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+}
+
+.badge-deceased {
+  background: var(--subtle);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.badge-unknown {
+  background: #FEF9C3;
+  color: #854D0E;
+  border: 1px solid #FEF08A;
+}
+
+/* ============================================================
+   PHOTO PORTRAIT
+   ============================================================ */
+.portrait-circle {
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  background: var(--subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.portrait-square {
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  background: var(--subtle);
+}
+
+/* ============================================================
+   SCROLL AREA
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* ============================================================
+   PRINT STYLES — Template Cetak Bagan Silsilah
+   Hanya mencetak area bagan silsilah dalam orientasi landscape,
+   menyembunyikan sidebar, navbar, header, toolbar, dan UI web lainnya.
+   ============================================================ */
+@media print {
+  @page {
+    size: landscape;
+    margin: 6mm;
+  }
+
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #152E22 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan semua elemen layout web umum saat mencetak */
+  aside,
+  nav,
+  header,
+  footer,
+  .app-sidebar,
+  .app-header,
+  .bottom-nav,
+  .no-print,
+  .canvas-controls,
+  .canvas-toolbar,
+  [role="toolbar"] {
+    display: none !important;
+  }
+
+  /* Hilangkan pembatas overflow dan scrollbar pada container */
+  .app-layout,
+  .app-main,
+  main,
+  .zuriat-chart-wrapper,
+  .zuriat-chart-outer-scroll {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #152E22 !important;
+  }
+
+  /* Area poster bagan silsilah utama */
+  #zuriat-chart-print-area {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    transform: none !important;
+    margin: 0 auto !important;
+    padding: 10px !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    background: #152E22 !important;
+  }
+
+  /* KUNCI: Pastikan semua tombol kartu profil di dalam bagan TETAP MUNCUL dan tidak disembunyikan */
+  #zuriat-chart-print-area button,
+  #zuriat-chart-print-area [role="button"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #zuriat-chart-print-area div {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* ============================================================
+   Action Toolbar Hover Transitions on Canvas Nodes
+   ============================================================ */
+.person-node .action-toolbar {
+  opacity: 0;
+  transform: translateY(2px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.person-node:hover .action-toolbar {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
