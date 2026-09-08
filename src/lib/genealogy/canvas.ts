@@ -872,79 +872,111 @@ export function buildCanvasGraph(
   }
 
   // 3. Buat Parent-Child Edges berlabel jelas
-  // Hindari duplikasi edge jika anak terdaftar ke ayah & ibu sekaligus dalam union yang sama
-  const processedChildUnion = new Set<string>();
-
+  // Kelompokkan relasi per anak untuk menghubungkan ke Union pernikahan orang tua secara rapi
+  const relsByChild = new Map<string, ParentChildRelationship[]>();
   for (const rel of parentChildRels) {
-    const isBiological = rel.biological_status === "biological" || !rel.biological_status;
-    const edgeLabel =
-      rel.biological_status === "adoptive"
-        ? "Adopsi"
-        : rel.biological_status === "step"
-        ? "Tiri"
-        : undefined;
+    if (!relsByChild.has(rel.child_id)) relsByChild.set(rel.child_id, []);
+    relsByChild.get(rel.child_id)!.push(rel);
+  }
 
+  const nodeIds = new Set(nodes.map((n) => n.id));
+
+  for (const [childId, rels] of relsByChild) {
+    const isBiological = rels.every(
+      (r) => r.biological_status === "biological" || !r.biological_status
+    );
+    const hasAdoptive = rels.some((r) => r.biological_status === "adoptive");
+    const hasStep = rels.some((r) => r.biological_status === "step");
+
+    const edgeLabel = hasAdoptive ? "Adopsi" : hasStep ? "Tiri" : undefined;
     const edgeStyle = isBiological
       ? { stroke: "#4B5563", strokeWidth: 2 }
       : { stroke: "#9CA3AF", strokeWidth: 2, strokeDasharray: "5,5" };
 
-    // Jika relasi terhubung ke union pernikahan
-    if (rel.union_id) {
-      const key = `${rel.union_id}-${rel.child_id}`;
-      if (processedChildUnion.has(key)) continue;
-      processedChildUnion.add(key);
-
-      const unionNodeId = `union-${rel.union_id}`;
-      const hasUnionNode = nodes.some((n) => n.id === unionNodeId);
-
-      if (hasUnionNode) {
-        edges.push({
-          id: `pcr-${rel.id}`,
-          source: unionNodeId,
-          sourceHandle: "bottom",
-          target: `person-${rel.child_id}`,
-          targetHandle: "top",
-          type: "smoothstep",
-          label: edgeLabel,
-          labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
-          labelBgStyle: edgeLabel
-            ? {
-                fill: "#FFFFFF",
-                stroke: "#E5E7EB",
-                strokeWidth: 1,
-                rx: 4,
-                ry: 4,
-              }
-            : undefined,
-          labelBgPadding: edgeLabel ? [3, 5] : undefined,
-          style: edgeStyle,
-        });
-        continue;
+    // 1. Cek apakah ada explicit union_id di relasi
+    let targetUnionId: string | null = null;
+    for (const r of rels) {
+      if (r.union_id && nodeIds.has(`union-${r.union_id}`)) {
+        targetUnionId = r.union_id;
+        break;
       }
     }
 
-    // Fallback: langsung dari parent ke child
-    edges.push({
-      id: `pcr-${rel.id}`,
-      source: `person-${rel.parent_id}`,
-      sourceHandle: "bottom",
-      target: `person-${rel.child_id}`,
-      targetHandle: "top",
-      type: "smoothstep",
-      label: edgeLabel,
-      labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
-      labelBgStyle: edgeLabel
-        ? {
-            fill: "#FFFFFF",
-            stroke: "#E5E7EB",
-            strokeWidth: 1,
-            rx: 4,
-            ry: 4,
-          }
-        : undefined,
-      labelBgPadding: edgeLabel ? [3, 5] : undefined,
-      style: edgeStyle,
-    });
+    // 2. Jika tidak ada explicit union_id, cari union yang dimiliki bersama oleh orang tua anak ini
+    if (!targetUnionId && rels.length >= 2) {
+      const parentIds = rels.map((r) => r.parent_id);
+      for (const union of unions) {
+        const members = unionMembersMap.get(union.id) || [];
+        const bothAreMembers = parentIds.filter((pId) => members.includes(pId)).length >= 2;
+        if (bothAreMembers && nodeIds.has(`union-${union.id}`)) {
+          targetUnionId = union.id;
+          break;
+        }
+      }
+    }
+
+    // 3. Jika anak hanya punya 1 orang tua terdaftar, periksa apakah orang tua tersebut terikat pada 1 union saja
+    if (!targetUnionId && rels.length === 1) {
+      const parentId = rels[0].parent_id;
+      const parentUnions = (unions || []).filter((u) => {
+        const members = unionMembersMap.get(u.id) || [];
+        return members.includes(parentId) && nodeIds.has(`union-${u.id}`);
+      });
+      if (parentUnions.length === 1 && rels[0].union_id) {
+        targetUnionId = parentUnions[0].id;
+      }
+    }
+
+    // Jika union ditemukan: buat 1 edge rapi dari UnionNode ke Child
+    if (targetUnionId) {
+      edges.push({
+        id: `pcr-union-${targetUnionId}-${childId}`,
+        source: `union-${targetUnionId}`,
+        sourceHandle: "bottom",
+        target: `person-${childId}`,
+        targetHandle: "top",
+        type: "smoothstep",
+        label: edgeLabel,
+        labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
+        labelBgStyle: edgeLabel
+          ? {
+              fill: "#FFFFFF",
+              stroke: "#E5E7EB",
+              strokeWidth: 1,
+              rx: 4,
+              ry: 4,
+            }
+          : undefined,
+        labelBgPadding: edgeLabel ? [3, 5] : undefined,
+        style: edgeStyle,
+      });
+      continue;
+    }
+
+    // Fallback: jika orang tua tidak terdaftar dalam union/pernikahan, sambungkan dari parent langsung
+    for (const rel of rels) {
+      edges.push({
+        id: `pcr-${rel.id}`,
+        source: `person-${rel.parent_id}`,
+        sourceHandle: "bottom",
+        target: `person-${rel.child_id}`,
+        targetHandle: "top",
+        type: "smoothstep",
+        label: edgeLabel,
+        labelStyle: edgeLabel ? { fill: "#4B5563", fontSize: 10, fontWeight: 600 } : undefined,
+        labelBgStyle: edgeLabel
+          ? {
+              fill: "#FFFFFF",
+              stroke: "#E5E7EB",
+              strokeWidth: 1,
+              rx: 4,
+              ry: 4,
+            }
+          : undefined,
+        labelBgPadding: edgeLabel ? [3, 5] : undefined,
+        style: edgeStyle,
+      });
+    }
   }
 
   return { nodes, edges };

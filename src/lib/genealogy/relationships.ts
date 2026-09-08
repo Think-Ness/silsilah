@@ -73,6 +73,32 @@ export async function getPersonUnions(personId: string): Promise<Array<{ union: 
   return result;
 }
 
+/** Ambil union antara dua orang jika ada */
+export async function getUnionBetweenPeople(
+  personAId: string,
+  personBId: string
+): Promise<Union | null> {
+  const { data: memberA, error: errA } = await supabase
+    .from("union_members")
+    .select("union_id")
+    .eq("person_id", personAId);
+
+  if (errA || !memberA || memberA.length === 0) return null;
+
+  const unionIdsA = memberA.map((m) => m.union_id);
+
+  const { data: memberB, error: errB } = await supabase
+    .from("union_members")
+    .select("union_id")
+    .eq("person_id", personBId)
+    .in("union_id", unionIdsA);
+
+  if (errB || !memberB || memberB.length === 0) return null;
+
+  const matchedUnionId = memberB[0].union_id;
+  return getUnion(matchedUnionId);
+}
+
 /** Buat union baru (pasangan) */
 export async function createUnion(input: CreateUnionInput): Promise<Union> {
   const { data: { user } } = await supabase.auth.getUser();

@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { UserPlus, Heart, Plus, Loader2, X } from "lucide-react";
 import { createPerson } from "@/lib/genealogy/people";
-import { createParentChildRelationship, createUnion } from "@/lib/genealogy/relationships";
+import {
+  createParentChildRelationship,
+  createUnion,
+  getUnionBetweenPeople,
+} from "@/lib/genealogy/relationships";
 import type { PersonWithPortrait } from "@/types/genealogy";
 
 export type QuickAddActionType = "add_father" | "add_mother" | "add_spouse" | "add_child";
@@ -143,10 +147,19 @@ export function QuickAddMemberModal({
           status: "active",
         });
       } else if (actionType === "add_child") {
+        let matchedUnionId: string | undefined;
+        if (selectedSpouseId) {
+          const union = await getUnionBetweenPeople(targetPerson.id, selectedSpouseId);
+          if (union) {
+            matchedUnionId = union.id;
+          }
+        }
+
         // Relasi ke target person
         await createParentChildRelationship({
           parent_id: targetPerson.id,
           child_id: newPerson.id,
+          union_id: matchedUnionId,
           relationship_type: "parent",
           biological_status: biologicalStatus,
         });
@@ -156,6 +169,7 @@ export function QuickAddMemberModal({
           await createParentChildRelationship({
             parent_id: selectedSpouseId,
             child_id: newPerson.id,
+            union_id: matchedUnionId,
             relationship_type: "parent",
             biological_status: biologicalStatus,
           });
