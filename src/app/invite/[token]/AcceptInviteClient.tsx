@@ -67,7 +67,16 @@ export function AcceptInviteClient({ invitation, token, serverError }: AcceptInv
         // Jika akun sudah pernah dibuat sebelumnya, coba login
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) {
-          setError(signUpError.message || signInError.message);
+          const rawMsg = (signUpError.message || signInError.message || "").toLowerCase();
+          if (rawMsg.includes("rate limit")) {
+            setError(
+              "Batas pengiriman email Supabase tercapai (rate limit). Ini terjadi karena opsi 'Confirm email' masih aktif di Supabase. Silakan nonaktifkan 'Confirm email' di Supabase Dashboard (Authentication -> Providers -> Email) agar anggota bisa langsung aktif tanpa verifikasi email."
+            );
+          } else if (rawMsg.includes("already registered") || rawMsg.includes("already in use")) {
+            setError("Email ini sudah terdaftar. Silakan login dengan password akun Anda.");
+          } else {
+            setError(signUpError.message || signInError.message);
+          }
           return;
         }
         if (signInData?.user) {
