@@ -424,11 +424,12 @@ export const PersonNode = memo(function PersonNode({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
-              fontSize: "13px",
+              fontSize: displayName.length > 32 ? "11px" : displayName.length > 22 ? "12px" : "13px",
               fontWeight: 700,
               color: isDeceased ? "#4B5563" : "var(--foreground)",
               lineHeight: 1.25,
               wordBreak: "break-word",
+              overflowWrap: "break-word",
             }}
           >
             {displayName}

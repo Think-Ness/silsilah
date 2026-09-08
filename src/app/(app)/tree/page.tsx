@@ -13,7 +13,7 @@ import { getAllPeople, getPersonProfile } from "@/lib/genealogy/people";
 import { getAllUnions, getAllParentChildRelationships } from "@/lib/genealogy/relationships";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LayoutGrid, Network, Edit3, Check, Users } from "lucide-react";
+import { LayoutGrid, Network, Edit3, Check, Users, Printer } from "lucide-react";
 
 const supabase = createClient();
 
@@ -460,6 +460,33 @@ export default function FamilyTreePage() {
               Template Print / Bagan Zuriat
             </button>
           </div>
+
+          {viewMode === "canvas" && (
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("silsilah:print-canvas"));
+              }}
+              title="Cetak tampilan kanvas saat ini langsung ke kertas / PDF"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 12px",
+                fontSize: "12px",
+                fontWeight: 600,
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                cursor: "pointer",
+                background: "var(--surface)",
+                color: "var(--foreground)",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Printer className="w-3.5 h-3.5 text-emerald-600" />
+              Cetak Kanvas
+            </button>
+          )}
         </div>
 
         {/* Center: Editable Title */}

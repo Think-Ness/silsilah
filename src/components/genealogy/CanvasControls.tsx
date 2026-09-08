@@ -1,17 +1,19 @@
 "use client";
 
-import { ZoomIn, ZoomOut, Maximize2, LayoutGrid, Minimize2 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, LayoutGrid, Minimize2, Printer } from "lucide-react";
 import { useReactFlow } from "@xyflow/react";
 import { useState, useCallback } from "react";
 
 interface CanvasControlsProps {
   onAutoLayout: () => void;
   isLayoutRunning?: boolean;
+  onPrint?: () => void;
 }
 
 export function CanvasControls({
   onAutoLayout,
   isLayoutRunning,
+  onPrint,
 }: CanvasControlsProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -96,6 +98,22 @@ export function CanvasControls({
           style={{ display: isFullscreen ? "none" : "block" }}
         />
       </button>
+
+      {onPrint && (
+        <>
+          <div className="canvas-control-separator" />
+          <button
+            id="canvas-print"
+            className="canvas-control-btn"
+            onClick={onPrint}
+            aria-label="Cetak Tampilan Kanvas"
+            title="Cetak Tampilan Kanvas"
+            style={{ color: "#2563EB" }}
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -51,6 +51,25 @@ function formatNameWithTitle(p: PersonWithPortrait): string {
   return name;
 }
 
+/** Menghasilkan font size adaptif & word-break agar nama panjang tidak merusak layout */
+function getAdaptiveNameStyle(name: string, defaultSize: number, minSize: number = 8.5) {
+  let size = defaultSize;
+  if (name.length > 34) {
+    size = Math.max(minSize, defaultSize - 3);
+  } else if (name.length > 24) {
+    size = Math.max(minSize, defaultSize - 2);
+  } else if (name.length > 17) {
+    size = Math.max(minSize, defaultSize - 1);
+  }
+
+  return {
+    fontSize: `${size}px`,
+    lineHeight: 1.25,
+    wordBreak: "break-word" as const,
+    overflowWrap: "break-word" as const,
+  };
+}
+
 export function ZuriatChartView({
   people,
   unions,
@@ -81,6 +100,27 @@ export function ZuriatChartView({
       }
     }
   }, []);
+
+  // Hitung skala otomatis saat mencetak agar muat di ukuran kertas apapun (A4, Folio/F4, A3, landscape)
+  const updatePrintScale = useCallback(() => {
+    if (chartRef.current) {
+      const chartWidth = chartRef.current.scrollWidth || 1200;
+      // Target lebar printable area landscape standar (~1080px)
+      const targetPrintWidth = 1080;
+      const printScale = chartWidth > targetPrintWidth ? +(targetPrintWidth / chartWidth).toFixed(3) : 1;
+      document.documentElement.style.setProperty("--zuriat-print-scale", `${printScale}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("beforeprint", updatePrintScale);
+    return () => window.removeEventListener("beforeprint", updatePrintScale);
+  }, [updatePrintScale]);
+
+  const handlePrint = () => {
+    updatePrintScale();
+    window.print();
+  };
 
   // Pas di layar saat pertama dimuat jika layar lebih sempit dari bagan
   useEffect(() => {
@@ -430,7 +470,7 @@ export function ZuriatChartView({
 
         {/* Print / Export Button */}
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -627,7 +667,13 @@ export function ZuriatChartView({
                     <div style={{ fontSize: "11px", fontWeight: 700, color: "#C2410C" }}>
                       MOYANG
                     </div>
-                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#0F172A" }}>
+                    <div
+                      style={{
+                        ...getAdaptiveNameStyle(formatNameWithTitle(p), 12, 9),
+                        fontWeight: 800,
+                        color: "#0F172A",
+                      }}
+                    >
                       {formatNameWithTitle(p)}
                     </div>
                   </button>
@@ -689,7 +735,13 @@ export function ZuriatChartView({
                       <div style={{ fontSize: "11px", fontWeight: 700, color: "#C2410C" }}>
                         MOYANG
                       </div>
-                      <div style={{ fontSize: "12px", fontWeight: 800, color: "#0F172A" }}>
+                      <div
+                        style={{
+                          ...getAdaptiveNameStyle(formatNameWithTitle(p), 12, 9),
+                          fontWeight: 800,
+                          color: "#0F172A",
+                        }}
+                      >
                         {formatNameWithTitle(p)}
                       </div>
                     </button>
@@ -745,14 +797,21 @@ export function ZuriatChartView({
               color: "#FFFFFF",
               border: "2px solid #4ADE80",
               borderRadius: "8px",
-              padding: "12px 24px",
+              padding: "12px 20px",
               textAlign: "center",
               cursor: "pointer",
               minWidth: "180px",
+              maxWidth: "260px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
             }}
           >
-            <div style={{ fontSize: "16px", fontWeight: 900, textTransform: "uppercase" }}>
+            <div
+              style={{
+                ...getAdaptiveNameStyle(formatNameWithTitle(mainPerson), 16, 12),
+                fontWeight: 900,
+                textTransform: "uppercase",
+              }}
+            >
               {formatNameWithTitle(mainPerson)}
             </div>
             <div style={{ fontSize: "11px", color: "#BBF7D0", marginTop: "2px", fontWeight: 600 }}>
@@ -789,14 +848,21 @@ export function ZuriatChartView({
                 color: "#FFFFFF",
                 border: "2px solid #4ADE80",
                 borderRadius: "8px",
-                padding: "12px 24px",
+                padding: "12px 20px",
                 textAlign: "center",
                 cursor: "pointer",
                 minWidth: "180px",
+                maxWidth: "260px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
               }}
             >
-              <div style={{ fontSize: "16px", fontWeight: 900, textTransform: "uppercase" }}>
+              <div
+                style={{
+                  ...getAdaptiveNameStyle(formatNameWithTitle(mainSpouse), 16, 12),
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                }}
+              >
                 {formatNameWithTitle(mainSpouse)}
               </div>
               <div style={{ fontSize: "11px", color: "#BBF7D0", marginTop: "2px", fontWeight: 600 }}>
@@ -896,7 +962,13 @@ export function ZuriatChartView({
                       display: "block",
                     }}
                   >
-                    <div style={{ fontSize: "13px", fontWeight: 900, textTransform: "uppercase" }}>
+                    <div
+                      style={{
+                        ...getAdaptiveNameStyle(formatNameWithTitle(col.child), 13, 10),
+                        fontWeight: 900,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       {formatNameWithTitle(col.child)}
                     </div>
                     <div style={{ fontSize: "10px", fontWeight: 700, color: "#92400E", marginTop: "2px" }}>
@@ -919,7 +991,12 @@ export function ZuriatChartView({
                         display: "block",
                       }}
                     >
-                      <div style={{ fontSize: "12px", fontWeight: 700 }}>
+                      <div
+                        style={{
+                          ...getAdaptiveNameStyle(formatNameWithTitle(col.spouse), 12, 9.5),
+                          fontWeight: 700,
+                        }}
+                      >
                         {formatNameWithTitle(col.spouse)}
                       </div>
                       <div style={{ fontSize: "10px", color: "#64748B", fontWeight: 600 }}>
@@ -991,7 +1068,12 @@ export function ZuriatChartView({
                               display: "block",
                             }}
                           >
-                            <div style={{ fontSize: "11px", fontWeight: 800 }}>
+                            <div
+                              style={{
+                                ...getAdaptiveNameStyle(formatNameWithTitle(gc.child), 11, 9),
+                                fontWeight: 800,
+                              }}
+                            >
                               {formatNameWithTitle(gc.child)}
                             </div>
                             <div style={{ fontSize: "9px", color: "#1D4ED8", fontWeight: 700 }}>
@@ -1014,7 +1096,12 @@ export function ZuriatChartView({
                                 display: "block",
                               }}
                             >
-                              <div style={{ fontSize: "11px", fontWeight: 700 }}>
+                              <div
+                                style={{
+                                  ...getAdaptiveNameStyle(formatNameWithTitle(gc.spouse), 11, 9),
+                                  fontWeight: 700,
+                                }}
+                              >
                                 {formatNameWithTitle(gc.spouse)}
                               </div>
                               <div style={{ fontSize: "9px", color: "#64748B", fontWeight: 600 }}>
@@ -1050,15 +1137,29 @@ export function ZuriatChartView({
                                   padding: "4px 8px",
                                   textAlign: "left",
                                   cursor: "pointer",
-                                  fontSize: "11px",
-                                  fontWeight: 700,
                                   color: "#1E3A8A",
-                                  whiteSpace: "nowrap",
+                                  maxWidth: "185px",
+                                  whiteSpace: "normal",
                                 }}
                               >
-                                <span>{formatNameWithTitle(ggc.child)}</span>
+                                <span
+                                  style={{
+                                    ...getAdaptiveNameStyle(formatNameWithTitle(ggc.child), 11, 8.5),
+                                    fontWeight: 700,
+                                    display: "block",
+                                  }}
+                                >
+                                  {formatNameWithTitle(ggc.child)}
+                                </span>
                                 {ggc.spouse && (
-                                  <span style={{ color: "#64748B", fontSize: "10px", display: "block" }}>
+                                  <span
+                                    style={{
+                                      ...getAdaptiveNameStyle(formatNameWithTitle(ggc.spouse), 10, 8),
+                                      color: "#64748B",
+                                      display: "block",
+                                      marginTop: "2px",
+                                    }}
+                                  >
                                     + {formatNameWithTitle(ggc.spouse)}
                                   </span>
                                 )}

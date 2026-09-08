@@ -650,7 +650,7 @@
 @media print {
   @page {
     size: landscape;
-    margin: 6mm;
+    margin: 5mm;
   }
 
   html, body {
@@ -658,9 +658,13 @@
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #152E22 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Default background untuk template cetak zuriat */
+  body:not(.printing-canvas) {
+    background: #152E22 !important;
   }
 
   /* Sembunyikan semua elemen layout web umum saat mencetak */
@@ -674,6 +678,7 @@
   .no-print,
   .canvas-controls,
   .canvas-toolbar,
+  .person-node .action-toolbar,
   [role="toolbar"] {
     display: none !important;
   }
@@ -689,16 +694,24 @@
     max-height: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  body:not(.printing-canvas) .app-layout,
+  body:not(.printing-canvas) .app-main,
+  body:not(.printing-canvas) main,
+  body:not(.printing-canvas) .zuriat-chart-wrapper,
+  body:not(.printing-canvas) .zuriat-chart-outer-scroll {
     background: #152E22 !important;
   }
 
-  /* Area poster bagan silsilah utama */
+  /* Area poster bagan silsilah utama — Auto scale ke ukuran kertas apapun */
   #zuriat-chart-print-area {
     position: static !important;
-    width: 100% !important;
+    width: max-content !important;
     min-width: 0 !important;
     max-width: none !important;
-    transform: none !important;
+    transform: scale(var(--zuriat-print-scale, 1)) !important;
+    transform-origin: top center !important;
     margin: 0 auto !important;
     padding: 10px !important;
     box-shadow: none !important;
@@ -719,6 +732,45 @@
   }
 
   #zuriat-chart-print-area div {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* ============================================================
+     PRINT KANVAS INTERAKTIF — Cetak Pohon Sesuai Tampilan Kanvas
+     ============================================================ */
+  body.printing-canvas {
+    background: #FFFFFF !important;
+  }
+
+  body.printing-canvas .genealogy-canvas,
+  body.printing-canvas .react-flow {
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: visible !important;
+    background: #FFFFFF !important;
+  }
+
+  body.printing-canvas .react-flow__background,
+  body.printing-canvas .react-flow__minimap,
+  body.printing-canvas .react-flow__controls,
+  body.printing-canvas .react-flow__panel {
+    display: none !important;
+  }
+
+  body.printing-canvas .react-flow__pane {
+    overflow: visible !important;
+  }
+
+  body.printing-canvas .react-flow__node {
+    visibility: visible !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-canvas .react-flow__edge {
     visibility: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

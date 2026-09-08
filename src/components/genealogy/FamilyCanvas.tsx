@@ -291,6 +291,32 @@ function CanvasInner({
     }
   }, [people, unions, unionMembers, parentChildRels, fitView]);
 
+  const handlePrintCanvas = useCallback(() => {
+    // Posisikan pohon keluarga di tengah dengan margin yang pas untuk halaman cetak
+    fitView({ duration: 250, padding: 0.1 });
+    document.body.classList.add("printing-canvas");
+
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  }, [fitView]);
+
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      document.body.classList.remove("printing-canvas");
+    };
+    const handlePrintEvent = () => {
+      handlePrintCanvas();
+    };
+
+    window.addEventListener("afterprint", handleAfterPrint);
+    window.addEventListener("silsilah:print-canvas", handlePrintEvent);
+    return () => {
+      window.removeEventListener("afterprint", handleAfterPrint);
+      window.removeEventListener("silsilah:print-canvas", handlePrintEvent);
+    };
+  }, [handlePrintCanvas]);
+
   if (people.length === 0) {
     return (
       <div className="empty-state" style={{ height: "100%" }}>
@@ -346,6 +372,7 @@ function CanvasInner({
         <CanvasControls
           onAutoLayout={handleAutoLayout}
           isLayoutRunning={isLayoutRunning}
+          onPrint={handlePrintCanvas}
         />
       </ReactFlow>
     </div>
