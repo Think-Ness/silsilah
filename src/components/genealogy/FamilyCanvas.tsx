@@ -75,7 +75,7 @@ function CanvasInner({
   const [selectedUnionMembers, setSelectedUnionMembers] = useState<PersonWithPortrait[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importSearchTerm, setImportSearchTerm] = useState("");
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes } = useReactFlow();
 
   const { user, isSuperAdmin } = useCurrentUser();
   const currentUserId = user?.id;
@@ -277,13 +277,21 @@ function CanvasInner({
 
   // Simpan posisi setiap kali pengguna selesai menggeser card & periksa drag-to-reorder saudara
   const handleNodeDragStop = useCallback(
-    (_event: any, draggedNode: Node, allNodes: Node[]) => {
+    (_event: any, draggedNode: Node) => {
       try {
+        const allCanvasNodes = getNodes();
         const posMap: Record<string, { x: number; y: number }> = {};
-        for (const n of allNodes) {
+        for (const n of allCanvasNodes) {
           if (n.position && n.id) {
             posMap[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
           }
+        }
+
+        if (draggedNode && draggedNode.id && draggedNode.position) {
+          posMap[draggedNode.id] = {
+            x: Math.round(draggedNode.position.x),
+            y: Math.round(draggedNode.position.y),
+          };
         }
 
         // Posisikan titik pernikahan (UnionNode) tepat di tengah kedua pasangan secara presisi
@@ -295,8 +303,8 @@ function CanvasInner({
             if (p1Pos && p2Pos) {
               const leftX = Math.min(p1Pos.x, p2Pos.x);
               const rightX = Math.max(p1Pos.x, p2Pos.x);
-              const uX = Math.round(leftX + 240 + (rightX - (leftX + 240)) / 2 - 14);
-              const uY = Math.round((p1Pos.y + p2Pos.y) / 2 + 115 / 2 - 14);
+              const uX = Math.round((leftX + rightX) / 2 + 120 - 16);
+              const uY = Math.round((p1Pos.y + p2Pos.y) / 2 + 57.5 - 16);
               posMap[`union-${union.id}`] = { x: uX, y: uY };
             }
           }
@@ -307,6 +315,7 @@ function CanvasInner({
         saveCanvasPositions(canvasId, posMap);
 
         // Deteksi apakah node yang digeser adalah anak dalam kelompok saudara kandung
+        let updatedChildOrders: { primaryParentId: string; coParentId: string | null; newOrderedIds: string[] } | null = null;
         if (draggedNode && draggedNode.id && draggedNode.id.startsWith("person-")) {
           const draggedPersonId = draggedNode.id.replace("person-", "");
           const parentRels = parentChildRels.filter((r) => r.child_id === draggedPersonId);
@@ -325,10 +334,10 @@ function CanvasInner({
               // Urutkan saudara berdasarkan posisi horizontal X terkini (dari kiri ke kanan)
               const siblingsWithX = siblingIds
                 .map((cId) => {
-                  const node = allNodes.find((n) => n.id === `person-${cId}`);
+                  const nodePos = posMap[`person-${cId}`];
                   return {
                     childId: cId,
-                    x: node ? node.position.x : 0,
+                    x: nodePos ? nodePos.x : 0,
                   };
                 })
                 .sort((a, b) => a.x - b.x);
@@ -354,31 +363,45 @@ function CanvasInner({
 
                 // Sync ke database di background
                 updateChildOrder(primaryParentId, newOrderedIds, coParentId);
-
-                // Update label Anak ke-1, ke-2 dst secara instan pada card canvas
-                setNodes((currentNodes) =>
-                  currentNodes.map((cn) => {
-                    if (cn.id.startsWith("person-")) {
-                      const pId = cn.id.replace("person-", "");
-                      const newIdx = newOrderedIds.indexOf(pId);
-                      if (newIdx !== -1) {
-                        return {
-                          ...cn,
-                          data: {
-                            ...cn.data,
-                            childOrderNumber: newIdx + 1,
-                            childOrderLabel: `Anak ke-${newIdx + 1}`,
-                          },
-                        };
-                      }
-                    }
-                    return cn;
-                  })
-                );
+                updatedChildOrders = { primaryParentId, coParentId, newOrderedIds };
               }
             }
           }
         }
+
+        // Update state nodes (posisi UnionNode baru & label anak)
+        setNodes((currentNodes) =>
+          currentNodes.map((cn) => {
+            if (cn.id.startsWith("union-")) {
+              const updatedUnionPos = posMap[cn.id];
+              if (
+                updatedUnionPos &&
+                (cn.position.x !== updatedUnionPos.x || cn.position.y !== updatedUnionPos.y)
+              ) {
+                return {
+                  ...cn,
+                  position: updatedUnionPos,
+                };
+              }
+            }
+            if (updatedChildOrders && cn.id.startsWith("person-")) {
+              const pId = cn.id.replace("person-", "");
+              const newIdx = updatedChildOrders.newOrderedIds.indexOf(pId);
+              if (newIdx !== -1) {
+                return {
+                  ...cn,
+                  data: {
+                    ...cn.data,
+                    childOrderNumber: newIdx + 1,
+                    childOrderLabel: `Anak ke-${newIdx + 1}`,
+                  },
+                };
+              }
+            }
+            return cn;
+          })
+        );
+
         // Perbarui edges agar selalu presisi menghubungkan sisi kanan/kiri terdekat
         const customPosMap = new Map<string, { x: number; y: number }>(Object.entries(posMap));
         const { edges: updatedEdges } = buildCanvasGraph(
@@ -389,7 +412,7 @@ function CanvasInner({
           customPosMap,
           undefined,
           rootPersonId,
-          includedPersonIds,
+          includedPersonIdsRef.current,
           canvasId,
           isDefaultCanvas
         );
@@ -399,13 +422,13 @@ function CanvasInner({
       }
     },
     [
+      getNodes,
       parentChildRels,
       people,
       unions,
       unionMembers,
       canvasId,
       rootPersonId,
-      includedPersonIds,
       isDefaultCanvas,
     ]
   );

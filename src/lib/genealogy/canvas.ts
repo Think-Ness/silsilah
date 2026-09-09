@@ -1217,16 +1217,29 @@ export function buildCanvasGraph(
     const memberIds = unionMembersMap.get(union.id) || [];
     if (memberIds.length < 2) continue;
 
-    const unionPos =
-      customPositions?.get(`union-${union.id}`) ||
-      computedPositions.get(`union-${union.id}`) || {
-        x: 0,
-        y: 0,
-      };
-
     const m1 = peopleMap.get(memberIds[0]);
     const m2 = peopleMap.get(memberIds[1]);
     const members = [m1, m2].filter((p): p is PersonWithPortrait => !!p);
+
+    const pos1 = m1
+      ? customPositions?.get(`person-${m1.id}`) || computedPositions.get(`person-${m1.id}`) || { x: 0, y: 0 }
+      : { x: 0, y: 0 };
+    const pos2 = m2
+      ? customPositions?.get(`person-${m2.id}`) || computedPositions.get(`person-${m2.id}`) || { x: 0, y: 0 }
+      : { x: 0, y: 0 };
+
+    let unionPos = customPositions?.get(`union-${union.id}`);
+    if (!unionPos) {
+      if (m1 && m2) {
+        const leftX = Math.min(pos1.x, pos2.x);
+        const rightX = Math.max(pos1.x, pos2.x);
+        const autoUX = Math.round((leftX + rightX) / 2 + PERSON_NODE_WIDTH / 2 - UNION_NODE_SIZE / 2);
+        const autoUY = Math.round((pos1.y + pos2.y) / 2 + PERSON_NODE_HEIGHT / 2 - UNION_NODE_SIZE / 2);
+        unionPos = { x: autoUX, y: autoUY };
+      } else {
+        unionPos = computedPositions.get(`union-${union.id}`) || { x: 0, y: 0 };
+      }
+    }
 
     nodes.push({
       id: `union-${union.id}`,
@@ -1240,15 +1253,6 @@ export function buildCanvasGraph(
     // Edge pernikahan: Orang di sebelah kiri -> titik kanan ke union (titik kiri),
     // Orang di sebelah kanan -> titik kiri ke union (titik kanan)
     if (m1 && m2) {
-      const pos1 =
-        customPositions?.get(`person-${m1.id}`) ||
-        computedPositions.get(`person-${m1.id}`) ||
-        { x: 0, y: 0 };
-      const pos2 =
-        customPositions?.get(`person-${m2.id}`) ||
-        computedPositions.get(`person-${m2.id}`) ||
-        { x: 0, y: 0 };
-
       const leftPerson = pos1.x <= pos2.x ? m1 : m2;
       const rightPerson = pos1.x <= pos2.x ? m2 : m1;
 
