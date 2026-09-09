@@ -711,15 +711,11 @@ export default function FamilyTreePage() {
         {/* Right Info / Action */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           {viewMode === "dashboard" ? (
-            <button
-              onClick={() =>
-                setCreateCanvasModal({ open: true, initialRootPersonId: null })
-              }
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Buat Kanvas Baru</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {canvasesData.length} Kanvas Tersedia
+              </span>
+            </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--muted)" }}>
               <Users className="w-3.5 h-3.5" />
@@ -762,6 +758,7 @@ export default function FamilyTreePage() {
               unionMembers={data?.unionMembers || []}
               parentChildRels={data?.parentChildRels || []}
               onPersonClick={handlePersonClick}
+              rootPersonId={activeCanvas?.root_person_id || undefined}
               customTitle={familyTitle}
               onTitleChange={handleTitleChange}
             />

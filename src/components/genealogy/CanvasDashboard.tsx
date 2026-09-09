@@ -132,7 +132,7 @@ export function CanvasDashboard({
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-emerald-900 hover:bg-emerald-50 text-sm font-bold shadow-lg shadow-black/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Buat Kanvas Baru</span>
+                <span>Buat Kanvas Baru</span>
               </button>
             </div>
           </div>
@@ -381,7 +381,7 @@ export function CanvasDashboard({
             </div>
             <div className="text-center space-y-1">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                + Buat Kanvas Silsilah Baru
+                Buat Kanvas Silsilah Baru
               </p>
               <p className="text-xs text-slate-400 max-w-[200px]">
                 Buat kanvas silsilah keluarga baru dari tokoh anggota mana pun
