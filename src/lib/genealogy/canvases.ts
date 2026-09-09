@@ -3,6 +3,12 @@
 // ============================================================
 
 import { createClient } from "@/lib/supabase/client";
+import {
+  createCanvasAction,
+  updateCanvasAction,
+  deleteCanvasAction,
+  saveCanvasPositionsAction,
+} from "@/app/actions/canvasActions";
 import type {
   Canvas,
   CanvasShare,
@@ -322,6 +328,32 @@ export async function createCanvas(
   const { data: userData } = await sb.auth.getUser();
   const currentUserId = userData?.user?.id || null;
 
+  // 1. Coba lewat Server Action terlebih dahulu untuk keandalan maksimal
+  try {
+    const res = await createCanvasAction(input);
+    if (res.success && res.data) {
+      const createdCanvas = res.data;
+      const localList = getLocalCanvases();
+      const updatedList = [
+        ...localList.filter((c) => c.id !== createdCanvas.id),
+        createdCanvas,
+      ];
+      saveLocalCanvases(updatedList);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("silsilah:canvases-updated", {
+            detail: { canvasId: createdCanvas.id },
+          })
+        );
+      }
+      return createdCanvas;
+    }
+  } catch (e) {
+    console.warn("createCanvasAction notice:", e);
+  }
+
+  // 2. Fallback direct client-side insert
   const newCanvasId =
     typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
@@ -358,26 +390,23 @@ export async function createCanvas(
         title: payload.title,
         description: payload.description,
         root_person_id: payload.root_person_id,
-        included_person_ids: payload.included_person_ids,
         is_default: payload.is_default,
         owner_id: currentUserId,
         is_public: payload.is_public,
-        settings: payload.settings,
+        settings: {
+          ...payload.settings,
+          included_person_ids: payload.included_person_ids,
+        },
         custom_positions: payload.custom_positions,
         created_by: currentUserId,
       })
-      .select(`
-        *,
-        root_person:people!canvases_root_person_id_fkey(
-          id, full_name, display_name, gender, life_status,
-          portrait:media!people_portrait_media_fk(id, storage_path, storage_bucket)
-        )
-      `)
+      .select("*")
       .single();
 
     if (!error && data) {
       createdCanvas = {
         ...data,
+        included_person_ids: payload.included_person_ids,
         user_permission: "owner",
       } as Canvas;
     }
@@ -411,6 +440,33 @@ export async function updateCanvas(
   input: UpdateCanvasInput,
   client?: any
 ): Promise<Canvas | null> {
+  // 1. Coba Server Action
+  try {
+    const res = await updateCanvasAction(id, input);
+    if (res.success && res.data) {
+      const localList = getLocalCanvases();
+      const idx = localList.findIndex((c) => c.id === id);
+      if (idx !== -1) {
+        localList[idx] = {
+          ...localList[idx],
+          ...res.data,
+        };
+        saveLocalCanvases(localList);
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("silsilah:canvases-updated", {
+            detail: { canvasId: id },
+          })
+        );
+      }
+      return res.data;
+    }
+  } catch (e) {
+    console.warn("updateCanvasAction notice:", e);
+  }
+
+  // 2. Direct client fallback
   const sb = getClient(client);
 
   const updatePayload: any = {
@@ -419,11 +475,17 @@ export async function updateCanvas(
   if (input.title !== undefined) updatePayload.title = input.title.trim();
   if (input.description !== undefined) updatePayload.description = input.description?.trim() || null;
   if (input.root_person_id !== undefined) updatePayload.root_person_id = input.root_person_id;
-  if (input.included_person_ids !== undefined) updatePayload.included_person_ids = input.included_person_ids;
   if (input.custom_positions !== undefined) updatePayload.custom_positions = input.custom_positions;
   if (input.settings !== undefined) updatePayload.settings = input.settings;
   if (input.is_default !== undefined) updatePayload.is_default = input.is_default;
   if (input.is_public !== undefined) updatePayload.is_public = input.is_public;
+
+  if (input.included_person_ids !== undefined) {
+    updatePayload.settings = {
+      ...(updatePayload.settings || {}),
+      included_person_ids: input.included_person_ids,
+    };
+  }
 
   let resultCanvas: Canvas | null = null;
 
@@ -432,13 +494,7 @@ export async function updateCanvas(
       .from("canvases")
       .update(updatePayload)
       .eq("id", id)
-      .select(`
-        *,
-        root_person:people!canvases_root_person_id_fkey(
-          id, full_name, display_name, gender, life_status,
-          portrait:media!people_portrait_media_fk(id, storage_path, storage_bucket)
-        )
-      `)
+      .select("*")
       .single();
 
     if (!error && data) {
@@ -521,29 +577,31 @@ export async function saveCanvasPositions(
     saveLocalCanvases(localList);
   }
 
-  const sb = getClient(client);
   try {
-    await sb
-      .from("canvases")
-      .update({
-        custom_positions: positions,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", canvasId);
+    await saveCanvasPositionsAction(canvasId, positions);
   } catch (err) {
-    // Non-blocking background save
+    const sb = getClient(client);
+    try {
+      await sb
+        .from("canvases")
+        .update({
+          custom_positions: positions,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", canvasId);
+    } catch (e) {}
   }
 }
 
 /** Hapus kanvas */
 export async function deleteCanvas(id: string, client?: any): Promise<boolean> {
-  const sb = getClient(client);
-
   try {
-    const { error } = await sb.from("canvases").delete().eq("id", id);
-    if (error) throw error;
+    await deleteCanvasAction(id);
   } catch (err) {
-    console.warn("Supabase delete canvas failed:", err);
+    const sb = getClient(client);
+    try {
+      await sb.from("canvases").delete().eq("id", id);
+    } catch (e) {}
   }
 
   const localList = getLocalCanvases();
