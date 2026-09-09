@@ -210,8 +210,32 @@ export async function getAllUnions(client?: any): Promise<Union[]> {
 
   let query = sb.from("unions").select("*").order("created_at");
 
-  // Isolasi data: jika user biasa, hanya ambil unions miliknya
-  if (!isSuperAdmin && !isSigap && currentUserId) {
+  // Isolasi data: jika user memiliki kanvas yang di-share, dapat mengakses unions terkait
+  let hasSharedCanvases = false;
+  if (currentUserId || email) {
+    try {
+      const { data: sharesData } = await sb
+        .from("canvas_shares")
+        .select("id")
+        .eq("user_id", currentUserId)
+        .limit(1);
+      if (sharesData && sharesData.length > 0) hasSharedCanvases = true;
+    } catch (e) {}
+
+    if (!hasSharedCanvases) {
+      try {
+        const raw = typeof window !== "undefined" ? localStorage.getItem("silsilah_user_shares_map_v1") : null;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if ((email && parsed[email]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
+            hasSharedCanvases = true;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (!isSuperAdmin && !isSigap && !hasSharedCanvases && currentUserId) {
     query = query.eq("created_by", currentUserId);
   }
 
@@ -416,8 +440,32 @@ export async function getAllParentChildRelationships(client?: any): Promise<Pare
 
   let query = sb.from("parent_child_relationships").select("*");
 
-  // Isolasi data: jika user biasa (bukan super_admin & bukan sigap), hanya ambil parent-child miliknya
-  if (!isSuperAdmin && !isSigap && currentUserId) {
+  // Isolasi data: jika user biasa (bukan super_admin & bukan sigap), hanya ambil parent-child miliknya kecuali memiliki kanvas yang di-share
+  let hasSharedCanvases = false;
+  if (currentUserId || email) {
+    try {
+      const { data: sharesData } = await sb
+        .from("canvas_shares")
+        .select("id")
+        .eq("user_id", currentUserId)
+        .limit(1);
+      if (sharesData && sharesData.length > 0) hasSharedCanvases = true;
+    } catch (e) {}
+
+    if (!hasSharedCanvases) {
+      try {
+        const raw = typeof window !== "undefined" ? localStorage.getItem("silsilah_user_shares_map_v1") : null;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if ((email && parsed[email]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
+            hasSharedCanvases = true;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (!isSuperAdmin && !isSigap && !hasSharedCanvases && currentUserId) {
     query = query.eq("created_by", currentUserId);
   }
 

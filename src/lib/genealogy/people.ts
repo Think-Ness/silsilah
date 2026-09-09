@@ -91,8 +91,35 @@ export async function getAllPeople(
 
   // Isolasi data:
   // - Super Admin & Sigap: melihat seluruh data silsilah
-  // - User Baru / Lain: hanya melihat anggota yang dibuat oleh user tersebut
-  if (!isSuperAdmin && !isSigap && currentUserId) {
+  // - User dengan kanvas yang dibagikan (shared): melihat data silsilah keluarga kanvas tersebut
+  // - User Baru tanpa share: hanya melihat anggota yang dibuat oleh user tersebut (kosong)
+  let hasSharedCanvases = false;
+  if (currentUserId || email) {
+    try {
+      const { data: sharesData } = await sb
+        .from("canvas_shares")
+        .select("id")
+        .eq("user_id", currentUserId)
+        .limit(1);
+      if (sharesData && sharesData.length > 0) {
+        hasSharedCanvases = true;
+      }
+    } catch (e) {}
+
+    if (!hasSharedCanvases) {
+      try {
+        const raw = typeof window !== "undefined" ? localStorage.getItem("silsilah_user_shares_map_v1") : null;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if ((email && parsed[email]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
+            hasSharedCanvases = true;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (!isSuperAdmin && !isSigap && !hasSharedCanvases && currentUserId) {
     query = query.eq("created_by", currentUserId);
   }
 

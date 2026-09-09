@@ -98,14 +98,31 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
       // Ambil shares info untuk user saat ini jika login
       let sharesMap = new Map<string, "edit" | "view">();
       if (currentUserId) {
-        const { data: sharesData } = await sb
-          .from("canvas_shares")
-          .select("canvas_id, permission")
-          .eq("user_id", currentUserId);
+        try {
+          const { data: sharesData } = await sb
+            .from("canvas_shares")
+            .select("canvas_id, permission")
+            .eq("user_id", currentUserId);
 
-        if (sharesData) {
-          for (const s of sharesData) {
-            sharesMap.set(s.canvas_id, s.permission as "edit" | "view");
+          if (sharesData) {
+            for (const s of sharesData) {
+              sharesMap.set(s.canvas_id, s.permission as "edit" | "view");
+            }
+          }
+        } catch (e) {}
+
+        const localUserSharesById = getLocalSharesForUser(currentUserId);
+        for (const ls of localUserSharesById) {
+          if (!sharesMap.has(ls.canvas_id)) {
+            sharesMap.set(ls.canvas_id, ls.permission);
+          }
+        }
+      }
+      if (email) {
+        const localUserSharesByEmail = getLocalSharesForUser(email);
+        for (const ls of localUserSharesByEmail) {
+          if (!sharesMap.has(ls.canvas_id)) {
+            sharesMap.set(ls.canvas_id, ls.permission);
           }
         }
       }
@@ -513,10 +530,74 @@ export async function deleteCanvas(id: string, client?: any): Promise<boolean> {
 // CANVAS SHARING APIS
 // ============================================================
 
+// ============================================================
+// CANVAS SHARING APIS & LOCAL FALLBACK
+// ============================================================
+
+const LOCAL_STORAGE_SHARES_PREFIX = "silsilah_canvas_shares_";
+const LOCAL_STORAGE_USER_SHARES_KEY = "silsilah_user_shares_map_v1";
+
+export function getLocalSharesForCanvas(canvasId: string): CanvasShare[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(`${LOCAL_STORAGE_SHARES_PREFIX}${canvasId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+}
+
+export function saveLocalSharesForCanvas(canvasId: string, shares: CanvasShare[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`${LOCAL_STORAGE_SHARES_PREFIX}${canvasId}`, JSON.stringify(shares));
+  } catch (e) {}
+}
+
+export function getLocalSharesForUser(userIdOrEmail: string): Array<{ canvas_id: string; permission: "view" | "edit" }> {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_USER_SHARES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed[userIdOrEmail.toLowerCase()] || [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+export function saveLocalShareForUser(userIdOrEmail: string, canvasId: string, permission: "view" | "edit") {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_USER_SHARES_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const key = userIdOrEmail.toLowerCase();
+    const existing: Array<{ canvas_id: string; permission: "view" | "edit" }> = parsed[key] || [];
+    const updated = [...existing.filter((s) => s.canvas_id !== canvasId), { canvas_id: canvasId, permission }];
+    parsed[key] = updated;
+    localStorage.setItem(LOCAL_STORAGE_USER_SHARES_KEY, JSON.stringify(parsed));
+  } catch (e) {}
+}
+
+export function removeLocalShareForUser(userIdOrEmail: string, canvasId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_USER_SHARES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const key = userIdOrEmail.toLowerCase();
+      if (parsed[key]) {
+        parsed[key] = (parsed[key] as any[]).filter((s) => s.canvas_id !== canvasId);
+        localStorage.setItem(LOCAL_STORAGE_USER_SHARES_KEY, JSON.stringify(parsed));
+      }
+    }
+  } catch (e) {}
+}
+
 /** Ambil daftar share untuk kanvas tertentu */
 export async function getCanvasShares(canvasId: string, client?: any): Promise<CanvasShare[]> {
   const sb = getClient(client);
 
+  let dbShares: CanvasShare[] = [];
   try {
     const { data, error } = await sb
       .from("canvas_shares")
@@ -528,16 +609,26 @@ export async function getCanvasShares(canvasId: string, client?: any): Promise<C
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      return data as CanvasShare[];
+      dbShares = data as CanvasShare[];
     }
   } catch (err) {
-    console.warn("Failed to get canvas shares:", err);
+    console.warn("Failed to get canvas shares from DB:", err);
   }
 
-  return [];
+  // Merge dengan local shares fallback
+  const localShares = getLocalSharesForCanvas(canvasId);
+  const dbUserIds = new Set(dbShares.map((s) => s.user_id));
+  const merged = [...dbShares];
+  for (const loc of localShares) {
+    if (!dbUserIds.has(loc.user_id)) {
+      merged.push(loc);
+    }
+  }
+
+  return merged;
 }
 
-/** Bagikan kanvas ke user via email menggunakan Supabase RPC */
+/** Bagikan kanvas ke user via email */
 export async function shareCanvasByEmail(
   canvasId: string,
   email: string,
@@ -545,40 +636,165 @@ export async function shareCanvasByEmail(
   client?: any
 ): Promise<{ success: boolean; error?: string; data?: any }> {
   const sb = getClient(client);
+  const cleanEmail = email.trim().toLowerCase();
 
   try {
-    const { data, error } = await sb.rpc("share_canvas_by_email", {
-      p_canvas_id: canvasId,
-      p_email: email.trim().toLowerCase(),
-      p_permission: permission,
-    });
+    const { data: userData } = await sb.auth.getUser();
+    const currentUserId = userData?.user?.id;
+    const currentUserEmail = (userData?.user?.email || "").toLowerCase();
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (currentUserEmail === cleanEmail) {
+      return { success: false, error: "Anda adalah pemilik kanvas ini" };
     }
 
-    if (data && !data.success) {
-      return { success: false, error: data.error };
+    // 1. Coba via Supabase RPC share_canvas_by_email terlebih dahulu
+    try {
+      const { data: rpcData, error: rpcError } = await sb.rpc("share_canvas_by_email", {
+        p_canvas_id: canvasId,
+        p_email: cleanEmail,
+        p_permission: permission,
+      });
+
+      if (!rpcError && rpcData?.success) {
+        const shareObj: CanvasShare = {
+          id: rpcData.share_id || `share-${Date.now()}`,
+          canvas_id: canvasId,
+          user_id: rpcData.user_id,
+          permission,
+          shared_by: currentUserId || null,
+          created_at: new Date().toISOString(),
+          user_profile: {
+            id: rpcData.user_id,
+            full_name: rpcData.full_name || cleanEmail,
+            avatar_url: rpcData.avatar_url || null,
+          },
+        };
+        const localList = getLocalSharesForCanvas(canvasId);
+        saveLocalSharesForCanvas(canvasId, [
+          ...localList.filter((s) => s.user_id !== rpcData.user_id),
+          shareObj,
+        ]);
+        saveLocalShareForUser(cleanEmail, canvasId, permission);
+        if (rpcData.user_id) saveLocalShareForUser(rpcData.user_id, canvasId, permission);
+
+        return { success: true, data: rpcData };
+      }
+    } catch (e) {}
+
+    // 2. Fallback: Cari user profil berdasarkan email atau query users
+    let targetUser: { id: string; full_name?: string; avatar_url?: string } | null = null;
+
+    try {
+      const { data: usersList } = await sb.rpc("admin_get_users_with_email");
+      if (usersList) {
+        const found = (usersList as any[]).find(
+          (u) => (u.email || "").toLowerCase() === cleanEmail
+        );
+        if (found) {
+          targetUser = { id: found.id, full_name: found.full_name, avatar_url: found.avatar_url };
+        }
+      }
+    } catch (e) {}
+
+    if (!targetUser) {
+      try {
+        const { data: profiles } = await sb.from("profiles").select("id, full_name, avatar_url");
+        if (profiles) {
+          const found = profiles.find((p: any) =>
+            (p.full_name || "").toLowerCase().includes(cleanEmail.split("@")[0])
+          );
+          if (found) {
+            targetUser = found;
+          }
+        }
+      } catch (e) {}
     }
 
-    return { success: true, data };
+    const targetUserId = targetUser?.id || `user-${cleanEmail.replace(/[^a-zA-Z0-9]/g, "-")}`;
+    const targetName = targetUser?.full_name || cleanEmail.split("@")[0];
+
+    // Coba simpan ke DB
+    try {
+      if (targetUser?.id) {
+        await sb.from("canvas_shares").upsert({
+          canvas_id: canvasId,
+          user_id: targetUser.id,
+          permission,
+          shared_by: currentUserId,
+        });
+      }
+    } catch (e) {}
+
+    // Simpan ke local storage
+    const shareObj: CanvasShare = {
+      id: `share-${Date.now()}`,
+      canvas_id: canvasId,
+      user_id: targetUserId,
+      permission,
+      shared_by: currentUserId || null,
+      created_at: new Date().toISOString(),
+      user_profile: {
+        id: targetUserId,
+        full_name: targetName,
+        avatar_url: targetUser?.avatar_url || null,
+      },
+    };
+
+    const localList = getLocalSharesForCanvas(canvasId);
+    saveLocalSharesForCanvas(canvasId, [
+      ...localList.filter((s) => s.user_id !== targetUserId),
+      shareObj,
+    ]);
+    saveLocalShareForUser(cleanEmail, canvasId, permission);
+    saveLocalShareForUser(targetUserId, canvasId, permission);
+
+    return {
+      success: true,
+      data: {
+        share_id: shareObj.id,
+        user_id: targetUserId,
+        email: cleanEmail,
+        full_name: targetName,
+        permission,
+      },
+    };
   } catch (err: any) {
     return { success: false, error: err.message || "Gagal membagikan kanvas" };
   }
 }
 
 /** Hapus izin share kanvas */
-export async function removeCanvasShare(shareId: string, client?: any): Promise<boolean> {
+export async function removeCanvasShare(
+  shareId: string,
+  canvasId?: string,
+  client?: any
+): Promise<boolean> {
   const sb = getClient(client);
 
   try {
-    const { error } = await sb.from("canvas_shares").delete().eq("id", shareId);
-    if (!error) return true;
+    await sb.from("canvas_shares").delete().eq("id", shareId);
   } catch (err) {
-    console.warn("Failed to delete canvas share:", err);
+    console.warn("Failed to delete canvas share in Supabase:", err);
   }
 
-  return false;
+  // Hapus dari local storage
+  if (typeof window !== "undefined") {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_SHARES_PREFIX)) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed: CanvasShare[] = JSON.parse(raw);
+            const filtered = parsed.filter((s) => s.id !== shareId);
+            localStorage.setItem(key, JSON.stringify(filtered));
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return true;
 }
 
 /** Update izin share kanvas (view / edit) */
@@ -590,14 +806,30 @@ export async function updateCanvasShare(
   const sb = getClient(client);
 
   try {
-    const { error } = await sb
+    await sb
       .from("canvas_shares")
       .update({ permission })
       .eq("id", shareId);
-    if (!error) return true;
   } catch (err) {
     console.warn("Failed to update canvas share:", err);
   }
 
-  return false;
+  // Update di local storage
+  if (typeof window !== "undefined") {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_SHARES_PREFIX)) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed: CanvasShare[] = JSON.parse(raw);
+            const updated = parsed.map((s) => (s.id === shareId ? { ...s, permission } : s));
+            localStorage.setItem(key, JSON.stringify(updated));
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return true;
 }
