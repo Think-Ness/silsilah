@@ -49,6 +49,20 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
     const { data: userData } = await sb.auth.getUser();
     const currentUserId = userData?.user?.id;
 
+    // Periksa apakah user saat ini adalah super_admin
+    let isSuperAdmin = false;
+    if (currentUserId) {
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("role")
+        .eq("id", currentUserId)
+        .maybeSingle();
+
+      if (profile?.role === "super_admin") {
+        isSuperAdmin = true;
+      }
+    }
+
     const { data, error } = await sb
       .from("canvases")
       .select(`
@@ -60,7 +74,7 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
       `)
       .order("created_at", { ascending: true });
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       // Ambil shares info untuk user saat ini jika login
       let sharesMap = new Map<string, "edit" | "view">();
       if (currentUserId) {
@@ -76,9 +90,20 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
         }
       }
 
-      const dbCanvases = (data as any[]).map((c) => {
+      // Filter hak akses:
+      // 1. Super Admin: melihat seluruh kanvas
+      // 2. User Biasa: hanya melihat kanvas miliknya (owner_id === currentUserId), yang di-share kepadanya, atau yang publik
+      const visibleCanvases = (data as any[]).filter((c) => {
+        if (isSuperAdmin) return true;
+        if (currentUserId && c.owner_id === currentUserId) return true;
+        if (sharesMap.has(c.id)) return true;
+        if (c.is_public === true) return true;
+        return false;
+      });
+
+      const dbCanvases = visibleCanvases.map((c) => {
         let user_permission: "owner" | "edit" | "view" = "view";
-        if (!c.owner_id || c.owner_id === currentUserId) {
+        if (isSuperAdmin || (currentUserId && c.owner_id === currentUserId) || (!c.owner_id && isSuperAdmin)) {
           user_permission = "owner";
         } else if (sharesMap.has(c.id)) {
           user_permission = sharesMap.get(c.id)!;
@@ -90,33 +115,13 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
         } as Canvas;
       });
 
-      saveLocalCanvases(dbCanvases);
       return dbCanvases;
     }
   } catch (err) {
-    console.warn("Supabase canvases query failed, using local fallback:", err);
+    console.warn("Supabase canvases query failed:", err);
   }
 
-  // Fallback: Local Storage atau Buat Default Canvas
-  const localList = getLocalCanvases();
-  if (localList.length > 0) {
-    return localList;
-  }
-
-  // Initial canvas fallback
-  const defaultCanvas: Canvas = {
-    id: "default-canvas",
-    title: "Pohon Silsilah Keluarga",
-    description: "Pohon silsilah dan dokumentasi garis keturunan keluarga besar.",
-    root_person_id: null,
-    is_default: false,
-    user_permission: "owner",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-
-  saveLocalCanvases([defaultCanvas]);
-  return [defaultCanvas];
+  return [];
 }
 
 /** Ambil satu kanvas berdasarkan ID */

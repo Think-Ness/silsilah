@@ -20,6 +20,18 @@ export async function listProfiles(): Promise<{
   error: string | null;
 }> {
   const supabase = await createClient();
+
+  // 1. Coba gunakan RPC admin_get_users_with_email untuk mendapatkan email nyata
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("admin_get_users_with_email");
+    if (!rpcError && rpcData && rpcData.length > 0) {
+      return { profiles: rpcData as Profile[], error: null };
+    }
+  } catch (err) {
+    // Fallback below
+  }
+
+  // 2. Fallback jika RPC belum ada
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
@@ -27,10 +39,121 @@ export async function listProfiles(): Promise<{
 
   if (error) return { profiles: [], error: error.message };
 
-  // Fetch emails separately via a custom RPC or admin API
-  // Since we can't use admin API on anon key, we'll use a join approach
-  // For now return what we have
   return { profiles: (data as Profile[]) ?? [], error: null };
+}
+
+/** Update user profile (Name, Role, Status, Linked Person) — super_admin only */
+export async function updateUserProfile(
+  userId: string,
+  input: {
+    full_name?: string;
+    role?: UserRole;
+    is_active?: boolean;
+    person_id?: string | null;
+  }
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Tidak terautentikasi" };
+
+  const { data: myProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!myProfile || myProfile.role !== "super_admin") {
+    return { error: "Hanya Super Admin yang dapat mengubah data pengguna" };
+  }
+
+  // Coba panggil RPC admin_update_user_profile
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc("admin_update_user_profile", {
+      p_user_id: userId,
+      p_full_name: input.full_name ?? null,
+      p_role: input.role ?? null,
+      p_is_active: input.is_active ?? null,
+      p_person_id: input.person_id ?? null,
+    });
+
+    if (!rpcErr && rpcRes) {
+      if (!rpcRes.success) return { error: rpcRes.error || "Gagal memperbarui pengguna" };
+      revalidatePath("/admin/users");
+      return { error: null };
+    }
+  } catch (err) {
+    // Fallback to direct update
+  }
+
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (input.full_name !== undefined) updateData.full_name = input.full_name;
+  if (input.role !== undefined) updateData.role = input.role;
+  if (input.is_active !== undefined) updateData.is_active = input.is_active;
+  if (input.person_id !== undefined) updateData.person_id = input.person_id;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/users");
+  return { error: null };
+}
+
+/** Delete a user account — super_admin only */
+export async function deleteUser(userId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Tidak terautentikasi" };
+
+  if (userId === user.id) {
+    return { error: "Anda tidak dapat menghapus akun Anda sendiri" };
+  }
+
+  const { data: myProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!myProfile || myProfile.role !== "super_admin") {
+    return { error: "Hanya Super Admin yang dapat menghapus pengguna" };
+  }
+
+  // Coba panggil RPC admin_delete_user
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc("admin_delete_user", {
+      p_user_id: userId,
+    });
+
+    if (!rpcErr && rpcRes) {
+      if (!rpcRes.success) return { error: rpcRes.error || "Gagal menghapus pengguna" };
+      revalidatePath("/admin/users");
+      return { error: null };
+    }
+  } catch (err) {
+    // Fallback to table delete
+  }
+
+  const { error: profileDeleteErr } = await supabase
+    .from("profiles")
+    .delete()
+    .eq("id", userId);
+
+  if (profileDeleteErr) return { error: profileDeleteErr.message };
+
+  revalidatePath("/admin/users");
+  return { error: null };
 }
 
 /** Update a user's role — super_admin only */
@@ -38,33 +161,7 @@ export async function updateUserRole(
   userId: string,
   role: UserRole
 ): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-
-  // Verify current user is super_admin
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Tidak terautentikasi" };
-
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!myProfile || myProfile.role !== "super_admin") {
-    return { error: "Hanya Super Admin yang dapat mengubah peran pengguna" };
-  }
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role, updated_at: new Date().toISOString() })
-    .eq("id", userId);
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/admin/users");
-  return { error: null };
+  return updateUserProfile(userId, { role });
 }
 
 /** Toggle user active status — super_admin only */
@@ -72,37 +169,7 @@ export async function toggleUserActive(
   userId: string,
   isActive: boolean
 ): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Tidak terautentikasi" };
-
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!myProfile || myProfile.role !== "super_admin") {
-    return { error: "Hanya Super Admin yang dapat mengubah status pengguna" };
-  }
-
-  // Cannot deactivate yourself
-  if (userId === user.id) {
-    return { error: "Tidak dapat menonaktifkan akun Anda sendiri" };
-  }
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ is_active: isActive, updated_at: new Date().toISOString() })
-    .eq("id", userId);
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/admin/users");
-  return { error: null };
+  return updateUserProfile(userId, { is_active: isActive });
 }
 
 // ============================================================

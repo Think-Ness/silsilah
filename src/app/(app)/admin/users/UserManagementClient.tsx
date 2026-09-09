@@ -7,6 +7,8 @@ import {
   toggleUserActive,
   createInvitation,
   revokeInvitation,
+  updateUserProfile,
+  deleteUser,
 } from "@/lib/admin/users";
 import {
   Users,
@@ -28,7 +30,10 @@ import {
   ExternalLink,
   Send,
   Check,
+  Edit2,
 } from "lucide-react";
+import { EditUserModal } from "@/components/admin/EditUserModal";
+import { DeleteUserDialog } from "@/components/admin/DeleteUserDialog";
 
 interface UserManagementClientProps {
   currentUserId: string;
@@ -58,11 +63,14 @@ const ROLE_ICONS: Record<UserRole, React.ElementType> = {
 export function UserManagementClient({
   currentUserId,
   currentUserEmail,
-  profiles,
+  profiles: initialProfiles,
   invitations,
 }: UserManagementClientProps) {
+  const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
   const [activeTab, setActiveTab] = useState<"users" | "invitations">("users");
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [editModalUser, setEditModalUser] = useState<Profile | null>(null);
+  const [deleteDialogUser, setDeleteDialogUser] = useState<Profile | null>(null);
   const [createdInviteModal, setCreatedInviteModal] = useState<{
     email: string;
     role: UserRole;
@@ -127,7 +135,12 @@ export function UserManagementClient({
     startTransition(async () => {
       const { error } = await updateUserRole(userId, role);
       if (error) showFeedback(error, true);
-      else showFeedback("Peran berhasil diperbarui");
+      else {
+        setProfiles((prev) =>
+          prev.map((p) => (p.id === userId ? { ...p, role } : p))
+        );
+        showFeedback("Peran berhasil diperbarui");
+      }
     });
   }
 
@@ -135,7 +148,41 @@ export function UserManagementClient({
     startTransition(async () => {
       const { error } = await toggleUserActive(userId, isActive);
       if (error) showFeedback(error, true);
-      else showFeedback(isActive ? "Pengguna diaktifkan" : "Pengguna dinonaktifkan");
+      else {
+        setProfiles((prev) =>
+          prev.map((p) => (p.id === userId ? { ...p, is_active: isActive } : p))
+        );
+        showFeedback(isActive ? "Pengguna diaktifkan" : "Pengguna dinonaktifkan");
+      }
+    });
+  }
+
+  async function handleSaveEditUser(
+    userId: string,
+    data: { full_name: string; role: UserRole; is_active: boolean }
+  ) {
+    startTransition(async () => {
+      const { error } = await updateUserProfile(userId, data);
+      if (error) {
+        showFeedback(error, true);
+      } else {
+        setProfiles((prev) =>
+          prev.map((p) => (p.id === userId ? { ...p, ...data } : p))
+        );
+        showFeedback("Data pengguna berhasil diperbarui");
+      }
+    });
+  }
+
+  async function handleConfirmDeleteUser(userId: string) {
+    startTransition(async () => {
+      const { error } = await deleteUser(userId);
+      if (error) {
+        showFeedback(error, true);
+      } else {
+        setProfiles((prev) => prev.filter((p) => p.id !== userId));
+        showFeedback("Pengguna berhasil dihapus dari sistem");
+      }
     });
   }
 
@@ -419,69 +466,117 @@ export function UserManagementClient({
                   {ROLE_LABELS[profile.role]}
                 </div>
 
-                {/* Actions — only for non-current users */}
-                {!isCurrentUser && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    {/* Role selector */}
-                    <div style={{ position: "relative" }}>
-                      <select
-                        id={`role-select-${profile.id}`}
-                        value={profile.role}
-                        onChange={(e) =>
-                          handleRoleChange(profile.id, e.target.value as UserRole)
-                        }
+                {/* Actions */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  {/* Edit button (available for all users) */}
+                  <button
+                    id={`edit-user-${profile.id}`}
+                    onClick={() => setEditModalUser(profile)}
+                    title="Edit Data Pengguna"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      background: "var(--background)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--foreground)",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <Edit2 size={13} />
+                  </button>
+
+                  {/* Actions for other users only */}
+                  {!isCurrentUser && (
+                    <>
+                      {/* Role selector */}
+                      <div style={{ position: "relative" }}>
+                        <select
+                          id={`role-select-${profile.id}`}
+                          value={profile.role}
+                          onChange={(e) =>
+                            handleRoleChange(profile.id, e.target.value as UserRole)
+                          }
+                          disabled={isPending}
+                          style={{
+                            padding: "4px 24px 4px 8px",
+                            fontSize: 12,
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            background: "var(--background)",
+                            color: "var(--foreground)",
+                            cursor: "pointer",
+                            appearance: "none",
+                          }}
+                        >
+                          <option value="super_admin">Super Admin</option>
+                          <option value="family_member">Anggota Keluarga</option>
+                          <option value="viewer">Pengamat (Hanya-Baca)</option>
+                        </select>
+                        <ChevronDown
+                          size={12}
+                          style={{
+                            position: "absolute",
+                            right: 6,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            pointerEvents: "none",
+                            color: "var(--muted)",
+                          }}
+                        />
+                      </div>
+
+                      {/* Toggle active */}
+                      <button
+                        id={`toggle-active-${profile.id}`}
+                        onClick={() => handleToggleActive(profile.id, !profile.is_active)}
                         disabled={isPending}
+                        title={profile.is_active ? "Nonaktifkan Pengguna" : "Aktifkan Pengguna"}
                         style={{
-                          padding: "4px 24px 4px 8px",
-                          fontSize: 12,
+                          width: 32,
+                          height: 32,
                           border: "1px solid var(--border)",
                           borderRadius: "var(--radius-sm)",
                           background: "var(--background)",
-                          color: "var(--foreground)",
                           cursor: "pointer",
-                          appearance: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: profile.is_active ? "#ef4444" : "#22c55e",
                         }}
                       >
-                        <option value="super_admin">Super Admin</option>
-                        <option value="family_member">Anggota Keluarga</option>
-                        <option value="viewer">Pengamat (Hanya-Baca)</option>
-                      </select>
-                      <ChevronDown
-                        size={12}
-                        style={{
-                          position: "absolute",
-                          right: 6,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          pointerEvents: "none",
-                          color: "var(--muted)",
-                        }}
-                      />
-                    </div>
+                        {profile.is_active ? <ShieldOff size={14} /> : <Shield size={14} />}
+                      </button>
 
-                    {/* Toggle active */}
-                    <button
-                      id={`toggle-active-${profile.id}`}
-                      onClick={() => handleToggleActive(profile.id, !profile.is_active)}
-                      disabled={isPending}
-                      title={profile.is_active ? "Nonaktifkan" : "Aktifkan"}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-sm)",
-                        background: "var(--background)",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: profile.is_active ? "#ef4444" : "#22c55e",
-                      }}
-                    >
-                      {profile.is_active ? <ShieldOff size={14} /> : <Shield size={14} />}
-                    </button>
-                  </div>
-                )}
+                      {/* Delete user */}
+                      <button
+                        id={`delete-user-${profile.id}`}
+                        onClick={() => setDeleteDialogUser(profile)}
+                        disabled={isPending}
+                        title="Hapus Pengguna"
+                        style={{
+                          width: 32,
+                          height: 32,
+                          border: "1px solid rgba(239,68,68,0.3)",
+                          borderRadius: "var(--radius-sm)",
+                          background: "rgba(239,68,68,0.06)",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#ef4444",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -947,6 +1042,22 @@ export function UserManagementClient({
           </div>
         </div>
       )}
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        open={!!editModalUser}
+        userProfile={editModalUser}
+        onClose={() => setEditModalUser(null)}
+        onSave={handleSaveEditUser}
+      />
+
+      {/* Delete User Confirmation Dialog */}
+      <DeleteUserDialog
+        open={!!deleteDialogUser}
+        userProfile={deleteDialogUser}
+        onClose={() => setDeleteDialogUser(null)}
+        onConfirm={handleConfirmDeleteUser}
+      />
     </div>
   );
 }
