@@ -21,6 +21,9 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    if ((data as any)?.canEdit === false) {
+      return;
+    }
     if (dragStartRef.current) {
       const dx = Math.abs(e.clientX - dragStartRef.current.x);
       const dy = Math.abs(e.clientY - dragStartRef.current.y);

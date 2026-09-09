@@ -158,7 +158,8 @@ export const PersonNode = memo(function PersonNode({
   }, []);
 
   const { isViewer, isSuperAdmin } = useCurrentUser();
-  const showActions = !isViewer && (isHovered || !!selected);
+  const nodeCanEdit = (data as any)?.canEdit !== undefined ? (data as any).canEdit : !isViewer;
+  const showActions = nodeCanEdit && !isViewer && (isHovered || !!selected);
 
   const handleQuickAdd = (
     e: React.MouseEvent,

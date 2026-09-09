@@ -25,7 +25,7 @@ import { buildCanvasGraph } from "@/lib/genealogy/canvas";
 import { runElkLayout } from "@/lib/layout/elkLayout";
 import { updateChildOrder } from "@/lib/genealogy/relationships";
 import { saveCanvasIncludedPersons, saveCanvasPositions } from "@/lib/genealogy/canvases";
-import { Search, UserPlus, X, Check, Download, Users, Plus } from "lucide-react";
+import { Search, UserPlus, X, Check, Download, Users, Plus, Eye } from "lucide-react";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import type {
   PersonWithPortrait,
@@ -77,6 +77,8 @@ function CanvasInner({
   const { fitView } = useReactFlow();
 
   const isDefaultCanvas = canvasId === "default-canvas" || canvasData?.is_default === true;
+  const userPermission = canvasData?.user_permission || "owner";
+  const canEdit = userPermission !== "view";
 
   // Inisialisasi daftar person ID yang masuk ke kanvas ini
   const [includedPersonIds, setIncludedPersonIds] = useState<string[] | null>(() => {
@@ -91,6 +93,11 @@ function CanvasInner({
     if (rootPersonId) return [rootPersonId];
     return null;
   });
+
+  const includedPersonIdsRef = useRef<string[] | null>(includedPersonIds);
+  useEffect(() => {
+    includedPersonIdsRef.current = includedPersonIds;
+  }, [includedPersonIds]);
 
   // Sync saat canvasData berubah
   useEffect(() => {
@@ -120,12 +127,10 @@ function CanvasInner({
       const customEvent = e as CustomEvent<{ personIds: string[] }>;
       if (customEvent.detail?.personIds?.length > 0) {
         const newIds = customEvent.detail.personIds;
-        setIncludedPersonIds((prev) => {
-          const current = prev || (rootPersonId ? [rootPersonId] : people.map((p) => p.id));
-          const combined = Array.from(new Set([...current, ...newIds]));
-          saveCanvasIncludedPersons(canvasId, combined);
-          return combined;
-        });
+        const current = includedPersonIdsRef.current || (rootPersonId ? [rootPersonId] : people.map((p) => p.id));
+        const combined = Array.from(new Set([...current, ...newIds]));
+        setIncludedPersonIds(combined);
+        saveCanvasIncludedPersons(canvasId, combined);
 
         // Hapus cache posisi agar layout cerdas menyusun anggota baru secara otomatis
         localStorage.removeItem(`silsilah_canvas_positions_${canvasId}`);
@@ -140,12 +145,11 @@ function CanvasInner({
       const customEvent = e as CustomEvent<{ personId: string }>;
       if (customEvent.detail?.personId) {
         const removeId = customEvent.detail.personId;
-        setIncludedPersonIds((prev) => {
-          if (!prev) return null;
-          const updated = prev.filter((id) => id !== removeId);
+        if (includedPersonIdsRef.current) {
+          const updated = includedPersonIdsRef.current.filter((id) => id !== removeId);
+          setIncludedPersonIds(updated);
           saveCanvasIncludedPersons(canvasId, updated);
-          return updated;
-        });
+        }
       }
     };
 
@@ -193,12 +197,14 @@ function CanvasInner({
       isDefaultCanvas
     );
 
-    // Mark selected node
+    // Mark selected node & attach permission flags
     const markedNodes = initialNodes.map((n) => ({
       ...n,
       selected: n.id === `person-${selectedPersonId}`,
       data: {
         ...n.data,
+        canEdit,
+        userPermission,
         isHighlighted: n.id === `person-${selectedPersonId}`,
       },
     }));
@@ -220,6 +226,8 @@ function CanvasInner({
     rootPersonId,
     includedPersonIds,
     isDefaultCanvas,
+    canEdit,
+    userPermission,
     fitView,
   ]);
 
@@ -596,16 +604,23 @@ function CanvasInner({
 
   return (
     <div className="genealogy-canvas" style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Top Floating Action: Impor Anggota dari Database */}
+      {/* Top Floating Action: Impor Anggota dari Database / Status Akses */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setIsImportModalOpen(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-lg shadow-black/5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-800 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs font-bold transition-all hover:scale-105"
-        >
-          <Users className="w-3.5 h-3.5 text-emerald-600" />
-          <span>+ Impor Anggota dari Database ({includedPersonIds?.length || people.length} di kanvas)</span>
-        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-lg shadow-black/5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-800 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs font-bold transition-all hover:scale-105"
+          >
+            <Users className="w-3.5 h-3.5 text-emerald-600" />
+            <span>+ Impor Anggota dari Database ({includedPersonIds?.length || people.length} di kanvas)</span>
+          </button>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 shadow-md text-amber-800 dark:text-amber-200 text-xs font-bold backdrop-blur-md">
+            <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Akses Lihat Saja (Viewer) — Mode Baca</span>
+          </div>
+        )}
       </div>
 
       <ReactFlow
@@ -622,7 +637,7 @@ function CanvasInner({
         zoomOnPinch={true}
         panOnDrag={true}
         panOnScroll={false}
-        nodesDraggable={true}
+        nodesDraggable={canEdit}
         elementsSelectable={true}
         className="genealogy-canvas"
         aria-label="Pohon silsilah keluarga"
