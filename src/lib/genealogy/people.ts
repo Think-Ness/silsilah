@@ -444,7 +444,7 @@ export async function getDescendants(
   return visited;
 }
 
-/** Hitung jumlah statistics */
+/** Hitung jumlah statistics dengan isolasi kepemilikan user */
 export async function getPeopleStats(client?: any): Promise<{
   total: number;
   living: number;
@@ -452,10 +452,39 @@ export async function getPeopleStats(client?: any): Promise<{
   unknown: number;
 }> {
   const sb = getClient(client);
-  const { data, error } = await sb
+
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
+  let query = sb
     .from("people")
     .select("life_status")
     .is("archived_at", null);
+
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    query = query.eq("created_by", currentUserId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
