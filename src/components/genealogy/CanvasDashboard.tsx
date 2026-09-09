@@ -65,33 +65,35 @@ export function CanvasDashboard({
     canvas: null,
   });
 
+  // Helper to determine canvas ownership vs shared status
+  const isOwnerCanvas = (c: Canvas) => {
+    if (c.user_permission === "owner") {
+      // Jika owner_id ada dan milik orang lain, maka ini adalah kanvas yang di-share (bukan milik sendiri)
+      if (c.owner_id && currentUserId && c.owner_id !== currentUserId && !isSuperAdmin) {
+        return false;
+      }
+      return true;
+    }
+    if (currentUserId && c.owner_id === currentUserId) return true;
+    return false;
+  };
+
   // Categorize counts
   const myCanvasesCount = useMemo(() => {
-    return canvases.filter(
-      (c) => c.user_permission === "owner" || !c.owner_id || c.owner_id === currentUserId
-    ).length;
-  }, [canvases, currentUserId]);
+    return canvases.filter((c) => isOwnerCanvas(c)).length;
+  }, [canvases, currentUserId, isSuperAdmin]);
 
   const sharedCanvasesCount = useMemo(() => {
-    return canvases.filter(
-      (c) =>
-        c.user_permission === "edit" ||
-        c.user_permission === "view" ||
-        (c.owner_id && c.owner_id !== currentUserId)
-    ).length;
-  }, [canvases, currentUserId]);
+    return canvases.filter((c) => !isOwnerCanvas(c) || (c.owner_id && currentUserId && c.owner_id !== currentUserId)).length;
+  }, [canvases, currentUserId, isSuperAdmin]);
 
   const filteredCanvases = useMemo(() => {
     return canvases.filter((c) => {
       // Tab filter
       if (activeTab === "my") {
-        const isMy = c.user_permission === "owner" || !c.owner_id || c.owner_id === currentUserId;
-        if (!isMy) return false;
+        if (!isOwnerCanvas(c)) return false;
       } else if (activeTab === "shared") {
-        const isShared =
-          (c.owner_id && c.owner_id !== currentUserId) ||
-          c.user_permission === "edit" ||
-          c.user_permission === "view";
+        const isShared = !isOwnerCanvas(c) || (c.owner_id && currentUserId && c.owner_id !== currentUserId) || c.user_permission === "edit" || c.user_permission === "view";
         if (!isShared) return false;
       }
 
@@ -102,7 +104,7 @@ export function CanvasDashboard({
         (c.root_person && c.root_person.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
       return matchesSearch;
     });
-  }, [canvases, activeTab, searchTerm, currentUserId]);
+  }, [canvases, activeTab, searchTerm, currentUserId, isSuperAdmin]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 p-6 md:p-8">

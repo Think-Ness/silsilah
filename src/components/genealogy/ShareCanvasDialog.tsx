@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import {
   Share2,
@@ -13,13 +11,20 @@ import {
   Loader2,
   X,
   Sparkles,
+  Mail,
 } from "lucide-react";
 import type { Canvas, CanvasShare } from "@/types/genealogy";
 import {
-  getCanvasShares,
-  shareCanvasByEmail,
-  removeCanvasShare,
-  updateCanvasShare,
+  shareCanvasAction,
+  getCanvasSharesAction,
+  removeCanvasShareAction,
+  updateCanvasShareAction,
+} from "@/app/actions/canvasShares";
+import {
+  getLocalSharesForCanvas,
+  saveLocalSharesForCanvas,
+  saveLocalShareForUser,
+  removeLocalShareForUser,
 } from "@/lib/genealogy/canvases";
 import { toast } from "sonner";
 
@@ -52,10 +57,21 @@ export function ShareCanvasDialog({
   async function loadShares(canvasId: string) {
     setSharesLoading(true);
     try {
-      const data = await getCanvasShares(canvasId);
-      setShares(data);
+      const serverShares = await getCanvasSharesAction(canvasId);
+      const localShares = getLocalSharesForCanvas(canvasId);
+
+      const dbUserIds = new Set(serverShares.map((s) => s.user_id));
+      const merged = [...serverShares];
+      for (const loc of localShares) {
+        if (!dbUserIds.has(loc.user_id)) {
+          merged.push(loc);
+        }
+      }
+
+      setShares(merged);
     } catch (err) {
       console.warn("Gagal memuat daftar share:", err);
+      setShares(getLocalSharesForCanvas(canvasId));
     } finally {
       setSharesLoading(false);
     }
@@ -66,14 +82,55 @@ export function ShareCanvasDialog({
     if (!canvas?.id || !email.trim()) return;
 
     setLoading(true);
+    const targetEmail = email.trim().toLowerCase();
     try {
-      const res = await shareCanvasByEmail(canvas.id, email.trim(), permission);
+      const res = await shareCanvasAction(canvas.id, targetEmail, permission);
       if (!res.success) {
         toast.error(res.error || "Gagal membagikan kanvas");
       } else {
-        toast.success(`Akses kanvas berhasil dibagikan ke ${email}`);
+        const newShare: CanvasShare = {
+          ...(res.share || {
+            id: `share-${Date.now()}`,
+            canvas_id: canvas.id,
+            user_id: `user-${targetEmail.replace(/[^a-zA-Z0-9]/g, "-")}`,
+            permission,
+            shared_by: null,
+            created_at: new Date().toISOString(),
+            user_profile: {
+              id: `user-${targetEmail.replace(/[^a-zA-Z0-9]/g, "-")}`,
+              full_name: targetEmail.split("@")[0],
+              avatar_url: null,
+            },
+          }),
+          ...({ email: targetEmail } as any),
+        };
+
+        // Save to local storage for instant multi-user sync
+        const currentLocal = getLocalSharesForCanvas(canvas.id);
+        const updatedLocal = [
+          ...currentLocal.filter((s) => s.user_id !== newShare.user_id),
+          newShare,
+        ];
+        saveLocalSharesForCanvas(canvas.id, updatedLocal);
+        saveLocalShareForUser(targetEmail, canvas.id, permission);
+        if (newShare.user_id) saveLocalShareForUser(newShare.user_id, canvas.id, permission);
+
+        setShares((prev) => [
+          ...prev.filter((s) => s.user_id !== newShare.user_id),
+          newShare,
+        ]);
+
+        toast.success(`Akses kanvas berhasil dibagikan ke ${targetEmail}`);
         setEmail("");
-        loadShares(canvas.id);
+
+        // Trigger update event
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("silsilah:canvases-updated", {
+              detail: { canvasId: canvas.id },
+            })
+          );
+        }
       }
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat membagikan kanvas");
@@ -82,27 +139,51 @@ export function ShareCanvasDialog({
     }
   }
 
-  async function handleRemoveShare(shareId: string, name?: string) {
+  async function handleRemoveShare(shareId: string, name?: string, userId?: string) {
     try {
-      const success = await removeCanvasShare(shareId);
-      if (success) {
-        toast.success(`Izin akses untuk ${name || "pengguna"} telah dicabut`);
-        setShares((prev) => prev.filter((s) => s.id !== shareId));
-      } else {
-        toast.error("Gagal mencabut akses");
+      await removeCanvasShareAction(shareId);
+      if (canvas?.id) {
+        const currentLocal = getLocalSharesForCanvas(canvas.id);
+        const updatedLocal = currentLocal.filter((s) => s.id !== shareId);
+        saveLocalSharesForCanvas(canvas.id, updatedLocal);
+        if (userId) removeLocalShareForUser(userId, canvas.id);
+      }
+      setShares((prev) => prev.filter((s) => s.id !== shareId));
+      toast.success(`Izin akses untuk ${name || "pengguna"} telah dicabut`);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("silsilah:canvases-updated", {
+            detail: { canvasId: canvas?.id },
+          })
+        );
       }
     } catch (err) {
       toast.error("Gagal mencabut akses");
     }
   }
 
-  async function handleUpdatePermission(shareId: string, newPerm: "view" | "edit") {
+  async function handleUpdatePermission(shareId: string, newPerm: "view" | "edit", userId?: string) {
     try {
-      const success = await updateCanvasShare(shareId, newPerm);
-      if (success) {
-        toast.success(`Izin diperbarui menjadi ${newPerm === "edit" ? "Editor" : "Viewer"}`);
-        setShares((prev) =>
-          prev.map((s) => (s.id === shareId ? { ...s, permission: newPerm } : s))
+      await updateCanvasShareAction(shareId, newPerm);
+      if (canvas?.id) {
+        const currentLocal = getLocalSharesForCanvas(canvas.id);
+        const updatedLocal = currentLocal.map((s) =>
+          s.id === shareId ? { ...s, permission: newPerm } : s
+        );
+        saveLocalSharesForCanvas(canvas.id, updatedLocal);
+        if (userId) saveLocalShareForUser(userId, canvas.id, newPerm);
+      }
+      setShares((prev) =>
+        prev.map((s) => (s.id === shareId ? { ...s, permission: newPerm } : s))
+      );
+      toast.success(`Izin diperbarui menjadi ${newPerm === "edit" ? "Editor" : "Viewer"}`);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("silsilah:canvases-updated", {
+            detail: { canvasId: canvas?.id },
+          })
         );
       }
     } catch (err) {
@@ -186,7 +267,7 @@ export function ShareCanvasDialog({
               </button>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              *Pengguna yang diundang harus sudah memiliki akun terdaftar di aplikasi silsilah ini.
+              *Pengguna yang diundang akan mendapatkan akses ke kanvas ini di tab &quot;Dibagikan ke Saya&quot;.
             </p>
           </form>
 
@@ -217,7 +298,9 @@ export function ShareCanvasDialog({
               <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/40 dark:bg-slate-950/40">
                 {shares.map((share) => {
                   const profile = share.user_profile;
-                  const name = profile?.full_name || share.user_id;
+                  const displayName = profile?.full_name || share.user_id;
+                  const isEmail = share.user_id.includes("@") || (share as any).email;
+                  const displayEmail = (share as any).email || (isEmail ? share.user_id : (profile as any)?.email);
 
                   return (
                     <div
@@ -225,25 +308,32 @@ export function ShareCanvasDialog({
                       className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-100/50 dark:hover:bg-slate-900/50 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 border border-emerald-300/40">
+                        <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 border border-emerald-300/40">
                           {profile?.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={profile.avatar_url}
-                              alt={name}
+                              alt={displayName}
                               className="w-full h-full object-cover rounded-full"
                             />
                           ) : (
-                            name.charAt(0).toUpperCase()
+                            displayName.charAt(0).toUpperCase()
                           )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                            {name}
+                            {displayName}
                           </p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {share.created_at ? new Date(share.created_at).toLocaleDateString("id-ID") : ""}
-                          </p>
+                          {displayEmail && displayEmail !== displayName ? (
+                            <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                              <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{displayEmail}</span>
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {share.created_at ? new Date(share.created_at).toLocaleDateString("id-ID") : ""}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -253,7 +343,8 @@ export function ShareCanvasDialog({
                           onChange={(e) =>
                             handleUpdatePermission(
                               share.id,
-                              e.target.value as "view" | "edit"
+                              e.target.value as "view" | "edit",
+                              share.user_id
                             )
                           }
                           className="px-2.5 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 focus:outline-none"
@@ -264,7 +355,7 @@ export function ShareCanvasDialog({
 
                         <button
                           type="button"
-                          onClick={() => handleRemoveShare(share.id, name)}
+                          onClick={() => handleRemoveShare(share.id, displayName, share.user_id)}
                           title="Cabut Akses"
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
                         >
