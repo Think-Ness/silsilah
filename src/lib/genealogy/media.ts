@@ -132,7 +132,41 @@ export function getMediaUrl(storagePath: string): string {
   return data.publicUrl;
 }
 
-/** Ambil semua media */
+async function getUserIsolationContext(sb: any) {
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
+  // Jika Sigap, otomatis klaim data legacy media yang uploaded_by-nya masih NULL
+  if (isSigap && currentUserId) {
+    sb.from("media")
+      .update({ uploaded_by: currentUserId })
+      .is("uploaded_by", null)
+      .then(() => {});
+  }
+
+  return { currentUserId, isSuperAdmin, isSigap };
+}
+
+/** Ambil semua media dengan isolasi kepemilikan user */
 export async function getAllMedia(
   options?: {
     media_type?: string;
@@ -142,10 +176,16 @@ export async function getAllMedia(
   client?: any
 ): Promise<Media[]> {
   const sb = getClient(client);
+  const { currentUserId, isSuperAdmin, isSigap } = await getUserIsolationContext(sb);
+
   let query = sb
     .from("media")
     .select("*")
     .order("created_at", { ascending: false });
+
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    query = query.eq("uploaded_by", currentUserId);
+  }
 
   if (options?.media_type) query = query.eq("media_type", options.media_type);
   if (options?.limit) query = query.limit(options.limit);
@@ -172,7 +212,7 @@ export interface MediaWithPerson extends Media {
   }>;
 }
 
-/** Ambil semua media dengan relasi person */
+/** Ambil semua media dengan relasi person dan isolasi kepemilikan user */
 export async function getAllMediaWithPeople(
   options?: {
     media_type?: string;
@@ -182,6 +222,8 @@ export async function getAllMediaWithPeople(
   client?: any
 ): Promise<MediaWithPerson[]> {
   const sb = getClient(client);
+  const { currentUserId, isSuperAdmin, isSigap } = await getUserIsolationContext(sb);
+
   try {
     let query = sb
       .from("media")
@@ -199,6 +241,10 @@ export async function getAllMediaWithPeople(
         )
       `)
       .order("created_at", { ascending: false });
+
+    if (!isSuperAdmin && !isSigap && currentUserId) {
+      query = query.eq("uploaded_by", currentUserId);
+    }
 
     if (options?.media_type) query = query.eq("media_type", options.media_type);
     if (options?.limit) query = query.limit(options.limit);
@@ -234,10 +280,17 @@ export async function deleteMediaById(id: string, storagePath: string): Promise<
   return deleteMedia({ id, storage_path: storagePath });
 }
 
-/** Stats */
+/** Stats dengan isolasi kepemilikan user */
 export async function getMediaStats(client?: any): Promise<{ total: number; photos: number; documents: number }> {
   const sb = getClient(client);
-  const { data } = await sb.from("media").select("media_type");
+  const { currentUserId, isSuperAdmin, isSigap } = await getUserIsolationContext(sb);
+
+  let query = sb.from("media").select("media_type");
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    query = query.eq("uploaded_by", currentUserId);
+  }
+
+  const { data } = await query;
   const items: Array<{ media_type: string }> = data || [];
   return {
     total: items.length,
