@@ -299,6 +299,18 @@ export async function saveCanvasPositions(
     } catch (e) {}
   }
 
+  // Update daftar kanvas lokal
+  const localList = getLocalCanvases();
+  const idx = localList.findIndex((c) => c.id === canvasId);
+  if (idx !== -1) {
+    localList[idx] = {
+      ...localList[idx],
+      custom_positions: positions,
+      updated_at: new Date().toISOString(),
+    };
+    saveLocalCanvases(localList);
+  }
+
   const sb = getClient(client);
   try {
     await sb

@@ -616,6 +616,108 @@ export function calculateFamilyTreePositions(
     }
   }
 
+  // 9. Atomic Unit-Level Anti-Collision Pass: Garansi mutlak tidak ada pasangan / keluarga yang bertumpuk atau menyusup
+  // Setiap unit keluarga (suami + union + istri-istri) diperlakukan sebagai 1 cluster atomik tidak terpisahkan.
+  interface UnitCluster {
+    id: string;
+    nodeIds: string[];
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  }
+
+  const clusters: UnitCluster[] = [];
+  const assignedNodes = new Set<string>();
+
+  // Bentuk cluster dari familyUnits
+  for (const unit of familyUnits) {
+    const nodeIds: string[] = [];
+    const pId = `person-${unit.primaryPerson.id}`;
+    if (positions.has(pId)) {
+      nodeIds.push(pId);
+      assignedNodes.add(pId);
+    }
+    for (const s of unit.spouses) {
+      const spId = `person-${s.spouse.id}`;
+      const unId = `union-${s.union.id}`;
+      if (positions.has(spId)) {
+        nodeIds.push(spId);
+        assignedNodes.add(spId);
+      }
+      if (positions.has(unId)) {
+        nodeIds.push(unId);
+        assignedNodes.add(unId);
+      }
+    }
+
+    if (nodeIds.length > 0) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const nId of nodeIds) {
+        const pos = positions.get(nId)!;
+        const w = nId.startsWith("person-") ? PERSON_NODE_WIDTH : UNION_NODE_SIZE;
+        const h = nId.startsWith("person-") ? PERSON_NODE_HEIGHT : UNION_NODE_SIZE;
+        if (pos.x < minX) minX = pos.x;
+        if (pos.x + w > maxX) maxX = pos.x + w;
+        if (pos.y < minY) minY = pos.y;
+        if (pos.y + h > maxY) maxY = pos.y + h;
+      }
+      clusters.push({ id: unit.id, nodeIds, minX, maxX, minY, maxY });
+    }
+  }
+
+  // Masukkan sisa node yang belum tercover sebagai cluster individual
+  for (const [nodeId, pos] of positions.entries()) {
+    if (!assignedNodes.has(nodeId)) {
+      const w = nodeId.startsWith("person-") ? PERSON_NODE_WIDTH : UNION_NODE_SIZE;
+      const h = nodeId.startsWith("person-") ? PERSON_NODE_HEIGHT : UNION_NODE_SIZE;
+      clusters.push({
+        id: `standalone-${nodeId}`,
+        nodeIds: [nodeId],
+        minX: pos.x,
+        maxX: pos.x + w,
+        minY: pos.y,
+        maxY: pos.y + h,
+      });
+    }
+  }
+
+  // Kelompokkan cluster berdasarkan baris horizontal (Y level dengan toleransi tinggi)
+  const rowClustersMap = new Map<number, UnitCluster[]>();
+  for (const cluster of clusters) {
+    const rowKey = Math.round(cluster.minY / 80) * 80;
+    if (!rowClustersMap.has(rowKey)) rowClustersMap.set(rowKey, []);
+    rowClustersMap.get(rowKey)!.push(cluster);
+  }
+
+  for (const [, rowClusters] of rowClustersMap.entries()) {
+    // Urutkan cluster dari kiri ke kanan berdasarkan minX
+    rowClusters.sort((a, b) => a.minX - b.minX);
+
+    for (let i = 0; i < rowClusters.length - 1; i++) {
+      const current = rowClusters[i];
+      const next = rowClusters[i + 1];
+
+      const minRequiredNextX = current.maxX + BESAN_GAP;
+
+      if (next.minX < minRequiredNextX) {
+        const shiftX = minRequiredNextX - next.minX;
+        // Geser seluruh cluster berikutnya dan semua node di dalamnya secara utuh
+        for (let j = i + 1; j < rowClusters.length; j++) {
+          const cToShift = rowClusters[j];
+          for (const nId of cToShift.nodeIds) {
+            const originalPos = positions.get(nId);
+            if (originalPos) {
+              positions.set(nId, { x: originalPos.x + shiftX, y: originalPos.y });
+            }
+          }
+          cToShift.minX += shiftX;
+          cToShift.maxX += shiftX;
+        }
+      }
+    }
+  }
+
   return positions;
 }
 

@@ -168,7 +168,9 @@ function CanvasInner({
 
       const saved =
         localStorage.getItem(`silsilah_canvas_positions_${canvasId}`) ||
-        localStorage.getItem("silsilah_custom_positions_v4");
+        (canvasData?.custom_positions && Object.keys(canvasData.custom_positions).length > 0
+          ? JSON.stringify(canvasData.custom_positions)
+          : null);
 
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -214,6 +216,7 @@ function CanvasInner({
     unionMembers,
     parentChildRels,
     canvasId,
+    canvasData,
     rootPersonId,
     includedPersonIds,
     isDefaultCanvas,
@@ -262,8 +265,26 @@ function CanvasInner({
             posMap[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
           }
         }
+
+        // Posisikan titik pernikahan (UnionNode) tepat di tengah kedua pasangan secara presisi
+        for (const union of unions) {
+          const members = unionMembers.filter((um) => um.union_id === union.id);
+          if (members.length >= 2) {
+            const p1Pos = posMap[`person-${members[0].person_id}`];
+            const p2Pos = posMap[`person-${members[1].person_id}`];
+            if (p1Pos && p2Pos) {
+              const leftX = Math.min(p1Pos.x, p2Pos.x);
+              const rightX = Math.max(p1Pos.x, p2Pos.x);
+              const uX = Math.round(leftX + 240 + (rightX - (leftX + 240)) / 2 - 14);
+              const uY = Math.round((p1Pos.y + p2Pos.y) / 2 + 115 / 2 - 14);
+              posMap[`union-${union.id}`] = { x: uX, y: uY };
+            }
+          }
+        }
+
+        // Simpan langsung ke localStorage & Supabase database per kanvas
         localStorage.setItem(`silsilah_canvas_positions_${canvasId}`, JSON.stringify(posMap));
-        localStorage.setItem("silsilah_custom_positions_v4", JSON.stringify(posMap));
+        saveCanvasPositions(canvasId, posMap);
 
         // Deteksi apakah node yang digeser adalah anak dalam kelompok saudara kandung
         if (draggedNode && draggedNode.id && draggedNode.id.startsWith("person-")) {
@@ -461,6 +482,7 @@ function CanvasInner({
       localStorage.removeItem("silsilah_custom_positions_v3");
       localStorage.removeItem("silsilah_custom_positions_v2");
       localStorage.removeItem("silsilah_custom_positions");
+      saveCanvasPositions(canvasId, {});
 
       const { nodes: initialNodes, edges: initialEdges } = buildCanvasGraph(
         people,
