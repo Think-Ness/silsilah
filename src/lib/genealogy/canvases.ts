@@ -49,18 +49,32 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
     const { data: userData } = await sb.auth.getUser();
     const currentUserId = userData?.user?.id;
 
-    // Periksa apakah user saat ini adalah super_admin
+    // Periksa peran user & apakah akun Sigap
     let isSuperAdmin = false;
+    let isSigap = false;
     if (currentUserId) {
       const { data: profile } = await sb
         .from("profiles")
-        .select("role")
+        .select("full_name, role")
         .eq("id", currentUserId)
         .maybeSingle();
 
       if (profile?.role === "super_admin") {
         isSuperAdmin = true;
       }
+      const fullName = (profile?.full_name || "").toLowerCase();
+      const email = (userData?.user?.email || "").toLowerCase();
+      if (fullName.includes("sigap") || email.includes("sigap")) {
+        isSigap = true;
+      }
+    }
+
+    // Jika user adalah Sigap, otomatis klaim/backfill kanvas yang belum memiliki owner_id
+    if (isSigap && currentUserId) {
+      sb.from("canvases")
+        .update({ owner_id: currentUserId, created_by: currentUserId })
+        .is("owner_id", null)
+        .then(() => {});
     }
 
     const { data, error } = await sb
@@ -92,9 +106,13 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
 
       // Filter hak akses:
       // 1. Super Admin: melihat seluruh kanvas
-      // 2. User Biasa: hanya melihat kanvas miliknya (owner_id === currentUserId), yang di-share kepadanya, atau yang publik
+      // 2. Akun Sigap: melihat seluruh kanvas keluarga miliknya / kanvas legacy
+      // 3. User Lain: HANYA melihat kanvas miliknya sendiri (owner_id === currentUserId) atau yang dibagikan
       const visibleCanvases = (data as any[]).filter((c) => {
         if (isSuperAdmin) return true;
+        if (isSigap) {
+          if (!c.owner_id || c.owner_id === currentUserId) return true;
+        }
         if (currentUserId && c.owner_id === currentUserId) return true;
         if (sharesMap.has(c.id)) return true;
         if (c.is_public === true) return true;
@@ -103,7 +121,7 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
 
       const dbCanvases = visibleCanvases.map((c) => {
         let user_permission: "owner" | "edit" | "view" = "view";
-        if (isSuperAdmin || (currentUserId && c.owner_id === currentUserId) || (!c.owner_id && isSuperAdmin)) {
+        if (isSuperAdmin || (currentUserId && c.owner_id === currentUserId) || (isSigap && !c.owner_id)) {
           user_permission = "owner";
         } else if (sharesMap.has(c.id)) {
           user_permission = sharesMap.get(c.id)!;

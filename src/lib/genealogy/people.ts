@@ -37,6 +37,7 @@ export async function getPerson(id: string, client?: any): Promise<PersonWithPor
 }
 
 /** Ambil semua people (tidak diarchive) */
+/** Ambil semua people (tidak diarchive) dengan isolasi kepemilikan user */
 export async function getAllPeople(
   options?: {
     gender?: string;
@@ -48,6 +49,37 @@ export async function getAllPeople(
   client?: any
 ): Promise<PersonWithPortrait[]> {
   const sb = getClient(client);
+
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
+  // Jika Sigap, otomatis klaim data legacy people yang created_by-nya masih NULL
+  if (isSigap && currentUserId) {
+    sb.from("people")
+      .update({ created_by: currentUserId, updated_by: currentUserId })
+      .is("created_by", null)
+      .then(() => {});
+  }
+
   let query = sb
     .from("people")
     .select(`
@@ -56,6 +88,13 @@ export async function getAllPeople(
     `)
     .is("archived_at", null)
     .order("full_name");
+
+  // Isolasi data:
+  // - Super Admin & Sigap: melihat seluruh data silsilah
+  // - User Baru / Lain: hanya melihat anggota yang dibuat oleh user tersebut
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    query = query.eq("created_by", currentUserId);
+  }
 
   if (options?.gender) query = query.eq("gender", options.gender);
   if (options?.life_status) query = query.eq("life_status", options.life_status);
