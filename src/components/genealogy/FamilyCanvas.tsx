@@ -24,11 +24,15 @@ import { EditUnionModal } from "./EditUnionModal";
 import { buildCanvasGraph } from "@/lib/genealogy/canvas";
 import { runElkLayout } from "@/lib/layout/elkLayout";
 import { updateChildOrder } from "@/lib/genealogy/relationships";
+import { saveCanvasIncludedPersons } from "@/lib/genealogy/canvases";
+import { Search, UserPlus, X, Check, Download, Users, Plus } from "lucide-react";
+import { getMediaUrl } from "@/lib/genealogy/media";
 import type {
   PersonWithPortrait,
   Union,
   UnionMember,
   ParentChildRelationship,
+  Canvas,
 } from "@/types/genealogy";
 
 const nodeTypes = {
@@ -39,6 +43,7 @@ const nodeTypes = {
 interface FamilyCanvasProps {
   canvasId?: string;
   rootPersonId?: string | null;
+  canvasData?: Canvas | null;
   people: PersonWithPortrait[];
   unions: Union[];
   unionMembers: UnionMember[];
@@ -52,6 +57,7 @@ interface FamilyCanvasProps {
 function CanvasInner({
   canvasId = "default-canvas",
   rootPersonId,
+  canvasData,
   people,
   unions,
   unionMembers,
@@ -66,8 +72,90 @@ function CanvasInner({
   const [isLayoutRunning, setIsLayoutRunning] = useState(false);
   const [selectedUnion, setSelectedUnion] = useState<Union | null>(null);
   const [selectedUnionMembers, setSelectedUnionMembers] = useState<PersonWithPortrait[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importSearchTerm, setImportSearchTerm] = useState("");
   const { fitView } = useReactFlow();
-  const hasInitialFitRef = useRef(false);
+
+  const isDefaultCanvas = canvasId === "default-canvas" || canvasData?.is_default === true;
+
+  // Inisialisasi daftar person ID yang masuk ke kanvas ini
+  const [includedPersonIds, setIncludedPersonIds] = useState<string[] | null>(() => {
+    if (isDefaultCanvas) return null;
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(`silsilah_canvas_included_${canvasId}`);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    if (canvasData?.included_person_ids) return canvasData.included_person_ids;
+    if (rootPersonId) return [rootPersonId];
+    return null;
+  });
+
+  // Sync saat canvasData berubah
+  useEffect(() => {
+    if (isDefaultCanvas) {
+      setIncludedPersonIds(null);
+    } else if (canvasData?.included_person_ids) {
+      setIncludedPersonIds(canvasData.included_person_ids);
+    } else {
+      if (typeof window !== "undefined") {
+        try {
+          const saved = localStorage.getItem(`silsilah_canvas_included_${canvasId}`);
+          if (saved) {
+            setIncludedPersonIds(JSON.parse(saved));
+            return;
+          }
+        } catch (e) {}
+      }
+      if (rootPersonId) {
+        setIncludedPersonIds([rootPersonId]);
+      }
+    }
+  }, [canvasId, canvasData, rootPersonId, isDefaultCanvas]);
+
+  // Listener untuk aksi impor snapshot & lepas anggota dari kanvas
+  useEffect(() => {
+    const handleImportEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ personIds: string[] }>;
+      if (customEvent.detail?.personIds?.length > 0) {
+        const newIds = customEvent.detail.personIds;
+        setIncludedPersonIds((prev) => {
+          const current = prev || (rootPersonId ? [rootPersonId] : people.map((p) => p.id));
+          const combined = Array.from(new Set([...current, ...newIds]));
+          saveCanvasIncludedPersons(canvasId, combined);
+          return combined;
+        });
+
+        // Hapus cache posisi agar layout cerdas menyusun anggota baru secara otomatis
+        localStorage.removeItem(`silsilah_canvas_positions_${canvasId}`);
+
+        setTimeout(() => {
+          fitView({ duration: 500, padding: 0.15 });
+        }, 120);
+      }
+    };
+
+    const handleRemoveEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ personId: string }>;
+      if (customEvent.detail?.personId) {
+        const removeId = customEvent.detail.personId;
+        setIncludedPersonIds((prev) => {
+          if (!prev) return null;
+          const updated = prev.filter((id) => id !== removeId);
+          saveCanvasIncludedPersons(canvasId, updated);
+          return updated;
+        });
+      }
+    };
+
+    window.addEventListener("silsilah:import-to-canvas", handleImportEvent);
+    window.addEventListener("silsilah:remove-from-canvas", handleRemoveEvent);
+    return () => {
+      window.removeEventListener("silsilah:import-to-canvas", handleImportEvent);
+      window.removeEventListener("silsilah:remove-from-canvas", handleRemoveEvent);
+    };
+  }, [canvasId, rootPersonId, people, fitView]);
 
   // Build graph dari data (dengan memuat posisi kustom pengguna jika ada)
   useEffect(() => {
@@ -97,7 +185,10 @@ function CanvasInner({
       parentChildRels,
       customPositionsMap,
       undefined,
-      rootPersonId
+      rootPersonId,
+      includedPersonIds,
+      canvasId,
+      isDefaultCanvas
     );
 
     // Mark selected node
@@ -117,7 +208,17 @@ function CanvasInner({
     setTimeout(() => {
       fitView({ duration: 400, padding: 0.15 });
     }, 80);
-  }, [people, unions, unionMembers, parentChildRels, canvasId, rootPersonId]);
+  }, [
+    people,
+    unions,
+    unionMembers,
+    parentChildRels,
+    canvasId,
+    rootPersonId,
+    includedPersonIds,
+    isDefaultCanvas,
+    fitView,
+  ]);
 
   // Update seleksi node secara instan tanpa rebuild seluruh graf atau reset zoom/posisi
   useEffect(() => {
@@ -246,14 +347,26 @@ function CanvasInner({
           parentChildRels,
           customPosMap,
           undefined,
-          rootPersonId
+          rootPersonId,
+          includedPersonIds,
+          canvasId,
+          isDefaultCanvas
         );
         setEdges(updatedEdges);
       } catch (e) {
         console.warn("Gagal menyimpan posisi custom node:", e);
       }
     },
-    [parentChildRels, people, unions, unionMembers, canvasId, rootPersonId]
+    [
+      parentChildRels,
+      people,
+      unions,
+      unionMembers,
+      canvasId,
+      rootPersonId,
+      includedPersonIds,
+      isDefaultCanvas,
+    ]
   );
 
   // Listener saat urutan anak diperbarui dari modal dialog
@@ -277,7 +390,10 @@ function CanvasInner({
         parentChildRels,
         customPositionsMap,
         undefined,
-        rootPersonId
+        rootPersonId,
+        includedPersonIds,
+        canvasId,
+        isDefaultCanvas
       );
       setNodes(newNodes);
       setEdges(newEdges);
@@ -285,7 +401,16 @@ function CanvasInner({
 
     window.addEventListener("silsilah:child-order-updated", handleOrderUpdated);
     return () => window.removeEventListener("silsilah:child-order-updated", handleOrderUpdated);
-  }, [people, unions, unionMembers, parentChildRels, canvasId, rootPersonId]);
+  }, [
+    people,
+    unions,
+    unionMembers,
+    parentChildRels,
+    canvasId,
+    rootPersonId,
+    includedPersonIds,
+    isDefaultCanvas,
+  ]);
 
   // Listener untuk membuka modal edit status pernikahan saat icon cincin di klik
   useEffect(() => {
@@ -344,7 +469,10 @@ function CanvasInner({
         parentChildRels,
         undefined,
         undefined,
-        rootPersonId
+        rootPersonId,
+        includedPersonIds,
+        canvasId,
+        isDefaultCanvas
       );
       setNodes(initialNodes);
       setEdges(initialEdges);
@@ -356,7 +484,17 @@ function CanvasInner({
     } finally {
       setIsLayoutRunning(false);
     }
-  }, [people, unions, unionMembers, parentChildRels, canvasId, rootPersonId, fitView]);
+  }, [
+    people,
+    unions,
+    unionMembers,
+    parentChildRels,
+    canvasId,
+    rootPersonId,
+    includedPersonIds,
+    isDefaultCanvas,
+    fitView,
+  ]);
 
   const handlePrintCanvas = useCallback(() => {
     // Posisikan pohon keluarga di tengah dengan margin yang pas untuk halaman cetak
@@ -384,6 +522,39 @@ function CanvasInner({
     };
   }, [handlePrintCanvas]);
 
+  // Filter daftar anggota untuk modal impor
+  const currentIncludedSet = new Set(
+    includedPersonIds || (isDefaultCanvas ? people.map((p) => p.id) : rootPersonId ? [rootPersonId] : [])
+  );
+
+  const filteredImportPeople = people.filter((p) => {
+    if (!importSearchTerm.trim()) return true;
+    const term = importSearchTerm.toLowerCase();
+    return (
+      p.full_name.toLowerCase().includes(term) ||
+      (p.display_name && p.display_name.toLowerCase().includes(term))
+    );
+  });
+
+  const handleToggleIncludePerson = (personId: string) => {
+    setIncludedPersonIds((prev) => {
+      const current = prev || (rootPersonId ? [rootPersonId] : people.map((p) => p.id));
+      let updated: string[];
+      if (current.includes(personId)) {
+        updated = current.filter((id) => id !== personId);
+      } else {
+        updated = [...current, personId];
+      }
+      saveCanvasIncludedPersons(canvasId, updated);
+      return updated;
+    });
+
+    localStorage.removeItem(`silsilah_canvas_positions_${canvasId}`);
+    setTimeout(() => {
+      fitView({ duration: 400, padding: 0.15 });
+    }, 100);
+  };
+
   if (people.length === 0) {
     return (
       <div className="empty-state" style={{ height: "100%" }}>
@@ -403,6 +574,20 @@ function CanvasInner({
 
   return (
     <div className="genealogy-canvas" style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Top Floating Action: Impor Anggota dari Database (Khusus Kanvas Cabang) */}
+      {!isDefaultCanvas && (
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-lg shadow-black/5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-800 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs font-bold transition-all hover:scale-105"
+          >
+            <Users className="w-3.5 h-3.5 text-emerald-600" />
+            <span>+ Impor Anggota dari Database ({includedPersonIds?.length || 1} di kanvas)</span>
+          </button>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -450,6 +635,130 @@ function CanvasInner({
         members={selectedUnionMembers}
         onClose={() => setSelectedUnion(null)}
       />
+
+      {/* Modal Impor Anggota dari Database */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Impor Anggota ke Kanvas
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Pilih anggota dari database silsilah untuk dimasukkan ke kanvas ini
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search input */}
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama anggota keluarga..."
+                  value={importSearchTerm}
+                  onChange={(e) => setImportSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            {/* People List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {filteredImportPeople.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  Tidak ditemukan anggota dengan nama tersebut.
+                </div>
+              ) : (
+                filteredImportPeople.map((p) => {
+                  const isIncluded = currentIncludedSet.has(p.id);
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-9 w-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-slate-300">
+                          {p.portrait ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={getMediaUrl(p.portrait.storage_path)}
+                              alt={p.full_name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            p.full_name.charAt(0)
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                            {p.full_name}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {p.gender === "male" ? "Laki-laki" : "Perempuan"}
+                            {p.life_status === "deceased" ? " (Alm)" : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleIncludePerson(p.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          isIncluded
+                            ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                            : "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-emerald-600 dark:hover:bg-emerald-400 dark:hover:text-white"
+                        }`}
+                      >
+                        {isIncluded ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Di Kanvas</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Masukkan</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
+              <span className="text-xs text-slate-500">
+                {currentIncludedSet.size} dari {people.length} anggota di kanvas ini
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all"
+              >
+                Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

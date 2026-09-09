@@ -2,7 +2,19 @@
 
 import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { User, UserPlus, Heart, Plus, Trash2, ArrowUpDown, ListOrdered, Layers } from "lucide-react";
+import {
+  User,
+  UserPlus,
+  Heart,
+  Plus,
+  Trash2,
+  ArrowUpDown,
+  ListOrdered,
+  Layers,
+  Download,
+  MinusCircle,
+  Sparkles,
+} from "lucide-react";
 import type { PersonNodeData } from "@/lib/genealogy/canvas";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import { useCurrentUser } from "@/context/UserRoleContext";
@@ -23,7 +35,17 @@ export const PersonNode = memo(function PersonNode({
   data,
   selected,
 }: PersonNodeProps) {
-  const { person, spouses, roleLabel, lineageRole, parentsNames, hasFather, hasMother } = data;
+  const {
+    person,
+    spouses,
+    roleLabel,
+    lineageRole,
+    parentsNames,
+    hasFather,
+    hasMother,
+    availableSnapshots,
+    isDefaultCanvas,
+  } = data;
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,6 +89,30 @@ export const PersonNode = memo(function PersonNode({
           targetPerson: person,
           actionType,
           spouses,
+        },
+      })
+    );
+  };
+
+  const handleImportSnapshot = (e: React.MouseEvent, personIds: string[]) => {
+    e.stopPropagation();
+    window.dispatchEvent(
+      new CustomEvent("silsilah:import-to-canvas", {
+        detail: {
+          personIds,
+          sourcePersonName: person.full_name,
+        },
+      })
+    );
+  };
+
+  const handleRemoveFromCanvas = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(
+      new CustomEvent("silsilah:remove-from-canvas", {
+        detail: {
+          personId: person.id,
+          personName: displayName,
         },
       })
     );
@@ -236,7 +282,7 @@ export const PersonNode = memo(function PersonNode({
       role="button"
       aria-label={`${displayName}`}
     >
-      {/* Floating Action Buttons: Top (Ayah / Ibu & Hapus) */}
+      {/* Floating Action Buttons: Top (Ayah / Ibu / Snapshot Orang Tua & Saudara) */}
       <div
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -244,35 +290,88 @@ export const PersonNode = memo(function PersonNode({
           showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
       >
-        {!hasFather && (
+        {/* Snapshot Orang Tua (Jika sudah ada di DB tapi belum ada di kanvas) */}
+        {availableSnapshots?.parents && availableSnapshots.parents.length > 0 ? (
           <button
             type="button"
-            onClick={(e) => handleQuickAdd(e, "add_father")}
-            title="Tambah Ayah"
-            aria-label="Tambah Ayah"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-blue-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+            onClick={(e) =>
+              handleImportSnapshot(
+                e,
+                availableSnapshots.parents.map((p) => p.id)
+              )
+            }
+            title={`Masukkan data Orang Tua (${availableSnapshots.parents.map((p) => p.display_name || p.full_name).join(" & ")}) ke kanvas ini`}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-105 cursor-pointer border border-blue-400"
           >
-            <UserPlus className="w-3 h-3 text-blue-300" />
-            <span>Ayah</span>
+            <Download className="w-3 h-3 text-blue-100" />
+            <span>+ Masukkan Orang Tua ({availableSnapshots.parents.length})</span>
           </button>
+        ) : (
+          <>
+            {!hasFather && (
+              <button
+                type="button"
+                onClick={(e) => handleQuickAdd(e, "add_father")}
+                title="Tambah Ayah Baru"
+                aria-label="Tambah Ayah"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-blue-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+              >
+                <UserPlus className="w-3 h-3 text-blue-300" />
+                <span>Ayah</span>
+              </button>
+            )}
+            {!hasMother && (
+              <button
+                type="button"
+                onClick={(e) => handleQuickAdd(e, "add_mother")}
+                title="Tambah Ibu Baru"
+                aria-label="Tambah Ibu"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-rose-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+              >
+                <UserPlus className="w-3 h-3 text-rose-300" />
+                <span>Ibu</span>
+              </button>
+            )}
+          </>
         )}
-        {!hasMother && (
+
+        {/* Snapshot Saudara Kandung (Jika ada di DB tapi belum ada di kanvas) */}
+        {availableSnapshots?.siblings && availableSnapshots.siblings.length > 0 && (
           <button
             type="button"
-            onClick={(e) => handleQuickAdd(e, "add_mother")}
-            title="Tambah Ibu"
-            aria-label="Tambah Ibu"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-rose-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+            onClick={(e) =>
+              handleImportSnapshot(
+                e,
+                availableSnapshots.siblings.map((p) => p.id)
+              )
+            }
+            title={`Masukkan ${availableSnapshots.siblings.length} Saudara Kandung dari database ke kanvas ini`}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold shadow-lg shadow-sky-600/30 transition-all hover:scale-105 cursor-pointer border border-sky-400"
           >
-            <UserPlus className="w-3 h-3 text-rose-300" />
-            <span>Ibu</span>
+            <Download className="w-3 h-3 text-sky-100" />
+            <span>+ Masukkan Saudara ({availableSnapshots.siblings.length})</span>
           </button>
         )}
+
+        {/* Tombol Keluarkan dari Kanvas (Khusus kanvas cabang/kustom) */}
+        {!isDefaultCanvas && (
+          <button
+            type="button"
+            onClick={handleRemoveFromCanvas}
+            title="Keluarkan anggota ini dari kanvas (data di database tidak terhapus)"
+            aria-label="Keluarkan dari Kanvas"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-600"
+          >
+            <MinusCircle className="w-3 h-3 text-slate-400" />
+            <span>Lepas</span>
+          </button>
+        )}
+
         {isSuperAdmin && (
           <button
             type="button"
             onClick={handleDelete}
-            title="Hapus Anggota (Khusus Super Admin)"
+            title="Hapus Anggota Permanen (Khusus Super Admin)"
             aria-label="Hapus Anggota"
             className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-900/95 hover:bg-red-600 text-slate-300 hover:text-white backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
           >
@@ -281,8 +380,8 @@ export const PersonNode = memo(function PersonNode({
         )}
       </div>
 
-      {/* Floating Action Button: Side (+ Pasangan) */}
-      {canAddSpouse && (
+      {/* Floating Action Button: Side (+ Pasangan / Snapshot Pasangan) */}
+      {(canAddSpouse || (availableSnapshots?.spouses && availableSnapshots.spouses.length > 0)) && (
         <div
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -290,74 +389,107 @@ export const PersonNode = memo(function PersonNode({
             showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         >
-          <button
-            type="button"
-            onClick={(e) => handleQuickAdd(e, "add_spouse")}
-            title={person.gender === "male" ? "Tambah Istri" : person.gender === "female" ? "Tambah Suami" : "Tambah Pasangan"}
-            aria-label="Tambah Pasangan"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-amber-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
-          >
-            <Heart className="w-3 h-3 text-amber-300" />
-            <span>{person.gender === "male" ? "+ Istri" : person.gender === "female" ? "+ Suami" : "+ Pasangan"}</span>
-          </button>
+          {availableSnapshots?.spouses && availableSnapshots.spouses.length > 0 ? (
+            <button
+              type="button"
+              onClick={(e) =>
+                handleImportSnapshot(
+                  e,
+                  availableSnapshots.spouses.map((p) => p.id)
+                )
+              }
+              title={`Masukkan Pasangan (${availableSnapshots.spouses.map((p) => p.display_name || p.full_name).join(", ")}) ke kanvas`}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-lg shadow-amber-600/30 transition-all hover:scale-105 cursor-pointer border border-amber-400"
+            >
+              <Download className="w-3 h-3 text-amber-100" />
+              <span>+ Masukkan Pasangan ({availableSnapshots.spouses.length})</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => handleQuickAdd(e, "add_spouse")}
+              title={person.gender === "male" ? "Tambah Istri Baru" : person.gender === "female" ? "Tambah Suami Baru" : "Tambah Pasangan Baru"}
+              aria-label="Tambah Pasangan"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-amber-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+            >
+              <Heart className="w-3 h-3 text-amber-300" />
+              <span>{person.gender === "male" ? "+ Istri" : person.gender === "female" ? "+ Suami" : "+ Pasangan"}</span>
+            </button>
+          )}
         </div>
       )}
 
-      {/* Floating Action Button: Bottom (+ Anak & Atur Urutan) */}
-      {((spouses && spouses.length > 0) || (data.childrenCount != null && data.childrenCount > 0)) && (
-        <div
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          className={`action-toolbar absolute top-full pt-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 transition-all duration-150 z-30 whitespace-nowrap ${
-            showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          {spouses && spouses.length > 0 && (
-            <button
-              type="button"
-              onClick={(e) => handleQuickAdd(e, "add_child")}
-              title="Tambah Anak"
-              aria-label="Tambah Anak"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/95 hover:bg-emerald-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-emerald-600/60"
-            >
-              <Plus className="w-3 h-3 text-emerald-200" />
-              <span>Anak</span>
-            </button>
-          )}
-          {data.childrenCount != null && data.childrenCount > 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.dispatchEvent(
-                  new CustomEvent("silsilah:reorder-children", {
-                    detail: {
-                      parentId: person.id,
-                      parentName: displayName,
-                    },
-                  })
-                );
-              }}
-              title="Atur Urutan Kelahiran Anak (Drag & Drop)"
-              aria-label="Atur Urutan Anak"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-emerald-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
-            >
-              <ArrowUpDown className="w-3 h-3 text-emerald-300" />
-              <span>Urutan</span>
-            </button>
-          )}
+      {/* Floating Action Button: Bottom (+ Anak / Snapshot Anak & Atur Urutan) */}
+      <div
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={`action-toolbar absolute top-full pt-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 transition-all duration-150 z-30 whitespace-nowrap ${
+          showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        {/* Snapshot Anak (Jika ada di DB tapi belum ada di kanvas) */}
+        {availableSnapshots?.children && availableSnapshots.children.length > 0 ? (
           <button
             type="button"
-            onClick={handleOpenCreateCanvas}
-            title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
-            aria-label="Buat Kanvas Silsilah"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
+            onClick={(e) =>
+              handleImportSnapshot(
+                e,
+                availableSnapshots.children.map((p) => p.id)
+              )
+            }
+            title={`Masukkan ${availableSnapshots.children.length} Anak dari database ke kanvas ini`}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 cursor-pointer border border-emerald-400"
           >
-            <Layers className="w-3 h-3 text-cyan-300" />
-            <span>+ Kanvas</span>
+            <Download className="w-3 h-3 text-emerald-100" />
+            <span>+ Masukkan Anak ({availableSnapshots.children.length})</span>
           </button>
-        </div>
-      )}
+        ) : spouses && spouses.length > 0 ? (
+          <button
+            type="button"
+            onClick={(e) => handleQuickAdd(e, "add_child")}
+            title="Tambah Anak Baru"
+            aria-label="Tambah Anak"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/95 hover:bg-emerald-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-emerald-600/60"
+          >
+            <Plus className="w-3 h-3 text-emerald-200" />
+            <span>Anak</span>
+          </button>
+        ) : null}
+
+        {data.childrenCount != null && data.childrenCount > 1 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(
+                new CustomEvent("silsilah:reorder-children", {
+                  detail: {
+                    parentId: person.id,
+                    parentName: displayName,
+                  },
+                })
+              );
+            }}
+            title="Atur Urutan Kelahiran Anak (Drag & Drop)"
+            aria-label="Atur Urutan Anak"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-emerald-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+          >
+            <ArrowUpDown className="w-3 h-3 text-emerald-300" />
+            <span>Urutan</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleOpenCreateCanvas}
+          title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
+          aria-label="Buat Kanvas Silsilah"
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
+        >
+          <Layers className="w-3 h-3 text-cyan-300" />
+          <span>+ Kanvas</span>
+        </button>
+      </div>
 
       {/* Connection handles */}
       <Handle

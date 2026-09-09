@@ -743,6 +743,7 @@ export default function FamilyTreePage() {
             <FamilyCanvas
               canvasId={activeCanvas?.id || "default-canvas"}
               rootPersonId={activeCanvas?.root_person_id || null}
+              canvasData={activeCanvas}
               people={data?.people || []}
               unions={data?.unions || []}
               unionMembers={data?.unionMembers || []}

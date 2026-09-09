@@ -128,11 +128,17 @@ export async function createCanvas(
       ? crypto.randomUUID()
       : `canvas-${Date.now()}`;
 
-  const payload = {
+  const payload: Canvas = {
     id: newCanvasId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
     root_person_id: input.root_person_id || null,
+    included_person_ids:
+      input.included_person_ids !== undefined
+        ? input.included_person_ids
+        : input.root_person_id
+        ? [input.root_person_id]
+        : null,
     is_default: input.is_default ?? false,
     settings: input.settings || { displayMode: "branch" },
     custom_positions: {},
@@ -149,6 +155,7 @@ export async function createCanvas(
         title: payload.title,
         description: payload.description,
         root_person_id: payload.root_person_id,
+        included_person_ids: payload.included_person_ids,
         is_default: payload.is_default,
         settings: payload.settings,
         custom_positions: payload.custom_positions,
@@ -203,6 +210,7 @@ export async function updateCanvas(
   if (input.title !== undefined) updatePayload.title = input.title.trim();
   if (input.description !== undefined) updatePayload.description = input.description?.trim() || null;
   if (input.root_person_id !== undefined) updatePayload.root_person_id = input.root_person_id;
+  if (input.included_person_ids !== undefined) updatePayload.included_person_ids = input.included_person_ids;
   if (input.custom_positions !== undefined) updatePayload.custom_positions = input.custom_positions;
   if (input.settings !== undefined) updatePayload.settings = input.settings;
   if (input.is_default !== undefined) updatePayload.is_default = input.is_default;
@@ -252,6 +260,28 @@ export async function updateCanvas(
   }
 
   return resultCanvas;
+}
+
+/** Simpan anggota yang dimasukkan ke kanvas */
+export async function saveCanvasIncludedPersons(
+  canvasId: string,
+  includedPersonIds: string[] | null,
+  client?: any
+): Promise<void> {
+  if (typeof window !== "undefined") {
+    try {
+      if (includedPersonIds) {
+        localStorage.setItem(
+          `silsilah_canvas_included_${canvasId}`,
+          JSON.stringify(includedPersonIds)
+        );
+      } else {
+        localStorage.removeItem(`silsilah_canvas_included_${canvasId}`);
+      }
+    } catch (e) {}
+  }
+
+  await updateCanvas(canvasId, { included_person_ids: includedPersonIds }, client);
 }
 
 /** Simpan posisi node khusus untuk kanvas tertentu */

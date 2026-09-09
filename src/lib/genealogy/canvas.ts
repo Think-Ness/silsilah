@@ -35,9 +35,14 @@ export interface PersonNodeData {
   isHighlighted?: boolean;
   hasFather?: boolean;
   hasMother?: boolean;
-  childrenCount?: number;
-  childOrderNumber?: number;
-  childOrderLabel?: string;
+  availableSnapshots?: {
+    parents: PersonWithPortrait[];
+    siblings: PersonWithPortrait[];
+    spouses: PersonWithPortrait[];
+    children: PersonWithPortrait[];
+  };
+  canvasId?: string;
+  isDefaultCanvas?: boolean;
   [key: string]: unknown;
 }
 
@@ -622,27 +627,81 @@ export function buildCanvasGraph(
   parentChildRels: ParentChildRelationship[],
   customPositions?: Map<string, { x: number; y: number }>,
   customChildOrders?: Map<string, string[]>,
-  rootPersonId?: string | null
+  rootPersonId?: string | null,
+  includedPersonIds?: string[] | null,
+  canvasId?: string,
+  isDefaultCanvas?: boolean
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
   const effectiveChildOrders = customChildOrders || getStoredChildOrders();
-  const peopleMap = new Map(people.map((p) => [p.id, p]));
+  const globalPeopleMap = new Map(people.map((p) => [p.id, p]));
+
+  // Global indexes across the entire database (for snapshot detection)
+  const globalChildToParentsMap = new Map<string, string[]>();
+  const globalParentToChildrenMap = new Map<string, string[]>();
+  const globalPersonToSpousesMap = new Map<string, string[]>();
+
+  for (const rel of parentChildRels) {
+    if (!globalChildToParentsMap.has(rel.child_id)) globalChildToParentsMap.set(rel.child_id, []);
+    globalChildToParentsMap.get(rel.child_id)!.push(rel.parent_id);
+
+    if (!globalParentToChildrenMap.has(rel.parent_id)) globalParentToChildrenMap.set(rel.parent_id, []);
+    if (!globalParentToChildrenMap.get(rel.parent_id)!.includes(rel.child_id)) {
+      globalParentToChildrenMap.get(rel.parent_id)!.push(rel.child_id);
+    }
+  }
+
+  for (const um of unionMembers) {
+    const unionMembersList = unionMembers.filter((m) => m.union_id === um.union_id && m.person_id !== um.person_id);
+    if (!globalPersonToSpousesMap.has(um.person_id)) globalPersonToSpousesMap.set(um.person_id, []);
+    for (const om of unionMembersList) {
+      if (!globalPersonToSpousesMap.get(um.person_id)!.includes(om.person_id)) {
+        globalPersonToSpousesMap.get(um.person_id)!.push(om.person_id);
+      }
+    }
+  }
+
+  // Filter people and relationships if this is a custom scoped canvas
+  const isCustomCanvas = !!(includedPersonIds && includedPersonIds.length > 0 && !isDefaultCanvas);
+  const activePeople = isCustomCanvas
+    ? people.filter((p) => includedPersonIds.includes(p.id))
+    : people;
+
+  const activePeopleSet = new Set(activePeople.map((p) => p.id));
+
+  // Filter unions & parentChildRels to only members present on canvas
+  const activeUnionMembers = isCustomCanvas
+    ? unionMembers.filter((um) => activePeopleSet.has(um.person_id))
+    : unionMembers;
+
+  const activeUnions = isCustomCanvas
+    ? unions.filter((u) => {
+        const members = activeUnionMembers.filter((um) => um.union_id === u.id);
+        return members.length >= 2;
+      })
+    : unions;
+
+  const activeParentChildRels = isCustomCanvas
+    ? parentChildRels.filter((r) => activePeopleSet.has(r.parent_id) && activePeopleSet.has(r.child_id))
+    : parentChildRels;
+
+  const peopleMap = new Map(activePeople.map((p) => [p.id, p]));
 
   // Hitung posisi pohon hierarkis cerdas
   const computedPositions = calculateFamilyTreePositions(
-    people,
-    unions,
-    unionMembers,
-    parentChildRels,
+    activePeople,
+    activeUnions,
+    activeUnionMembers,
+    activeParentChildRels,
     effectiveChildOrders,
     rootPersonId
   );
 
   // Map union -> members
   const unionMembersMap = new Map<string, string[]>();
-  for (const um of unionMembers) {
+  for (const um of activeUnionMembers) {
     if (!unionMembersMap.has(um.union_id)) unionMembersMap.set(um.union_id, []);
     unionMembersMap.get(um.union_id)!.push(um.person_id);
   }
@@ -652,7 +711,7 @@ export function buildCanvasGraph(
   const parentToChildrenMap = new Map<string, string[]>();
   const childBiologicalStatusMap = new Map<string, string>();
 
-  for (const rel of parentChildRels) {
+  for (const rel of activeParentChildRels) {
     if (!childToParentsMap.has(rel.child_id)) childToParentsMap.set(rel.child_id, []);
     childToParentsMap.get(rel.child_id)!.push(rel.parent_id);
 
@@ -858,14 +917,15 @@ export function buildCanvasGraph(
   }
 
   // 1. Buat Person Nodes
-  for (const person of people) {
+  // 1. Buat Person Nodes
+  for (const person of activePeople) {
     const pos =
       customPositions?.get(`person-${person.id}`) ||
       computedPositions.get(`person-${person.id}`) ||
       { x: 0, y: 0 };
 
-    // Cari pasangan untuk info di node
-    const personUnionIds = unionMembers
+    // Cari pasangan untuk info di node (yang aktif di kanvas)
+    const personUnionIds = activeUnionMembers
       .filter((um) => um.person_id === person.id)
       .map((um) => um.union_id);
 
@@ -881,7 +941,7 @@ export function buildCanvasGraph(
       .map((id) => peopleMap.get(id))
       .filter((p): p is PersonWithPortrait => !!p);
 
-    // Cari orang tua
+    // Cari orang tua aktif di kanvas
     const pIds = childToParentsMap.get(person.id) || [];
     const parentPeople = pIds.map((id) => peopleMap.get(id)).filter(Boolean) as PersonWithPortrait[];
     const hasFather = parentPeople.some((p) => p.gender === "male");
@@ -889,6 +949,52 @@ export function buildCanvasGraph(
     const parentsNames = parentPeople
       .map((p) => p.display_name || p.full_name)
       .filter(Boolean) as string[];
+
+    // Hitung Snapshot data di DB yang belum dimasukkan ke kanvas ini
+    let availableSnapshots: PersonNodeData["availableSnapshots"] | undefined = undefined;
+    if (isCustomCanvas) {
+      // 1. Orang tua di DB yang belum ada di kanvas
+      const globalParentIds = globalChildToParentsMap.get(person.id) || [];
+      const availableParents = globalParentIds
+        .filter((pId) => !activePeopleSet.has(pId))
+        .map((pId) => globalPeopleMap.get(pId))
+        .filter((p): p is PersonWithPortrait => !!p);
+
+      // 2. Pasangan di DB yang belum ada di kanvas
+      const globalSpouseIds = globalPersonToSpousesMap.get(person.id) || [];
+      const availableSpouses = globalSpouseIds
+        .filter((sId) => !activePeopleSet.has(sId))
+        .map((sId) => globalPeopleMap.get(sId))
+        .filter((p): p is PersonWithPortrait => !!p);
+
+      // 3. Anak di DB yang belum ada di kanvas
+      const globalChildIds = globalParentToChildrenMap.get(person.id) || [];
+      const availableChildren = globalChildIds
+        .filter((cId) => !activePeopleSet.has(cId))
+        .map((cId) => globalPeopleMap.get(cId))
+        .filter((p): p is PersonWithPortrait => !!p);
+
+      // 4. Saudara di DB yang belum ada di kanvas
+      const availableSiblingsSet = new Set<string>();
+      for (const parentId of globalParentIds) {
+        const sibIds = globalParentToChildrenMap.get(parentId) || [];
+        for (const sId of sibIds) {
+          if (sId !== person.id && !activePeopleSet.has(sId)) {
+            availableSiblingsSet.add(sId);
+          }
+        }
+      }
+      const availableSiblings = Array.from(availableSiblingsSet)
+        .map((sId) => globalPeopleMap.get(sId))
+        .filter((p): p is PersonWithPortrait => !!p);
+
+      availableSnapshots = {
+        parents: availableParents,
+        siblings: availableSiblings,
+        spouses: availableSpouses,
+        children: availableChildren,
+      };
+    }
 
     // Tentukan lineageRole dan roleLabel dari relativeRoleMap
     const relInfo = relativeRoleMap.get(person.id);
@@ -946,8 +1052,8 @@ export function buildCanvasGraph(
             if (idxB !== -1) return 1;
           }
 
-          const relA = parentChildRels.find((r) => r.child_id === aId && pIds.includes(r.parent_id));
-          const relB = parentChildRels.find((r) => r.child_id === bId && pIds.includes(r.parent_id));
+          const relA = activeParentChildRels.find((r) => r.child_id === aId && pIds.includes(r.parent_id));
+          const relB = activeParentChildRels.find((r) => r.child_id === bId && pIds.includes(r.parent_id));
           if (relA && relB && typeof relA.sort_order === "number" && typeof relB.sort_order === "number") {
             if (relA.sort_order !== relB.sort_order) return relA.sort_order - relB.sort_order;
           }
@@ -993,6 +1099,9 @@ export function buildCanvasGraph(
         childrenCount,
         childOrderNumber,
         childOrderLabel,
+        availableSnapshots,
+        canvasId,
+        isDefaultCanvas,
       } as PersonNodeData,
       width: PERSON_NODE_WIDTH,
       height: PERSON_NODE_HEIGHT,

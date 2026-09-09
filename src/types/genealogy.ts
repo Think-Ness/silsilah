@@ -347,6 +347,7 @@ export interface Canvas {
   description?: string | null;
   root_person_id?: string | null;
   root_person?: PersonWithPortrait | null;
+  included_person_ids?: string[] | null;
   custom_positions?: Record<string, { x: number; y: number }> | null;
   settings?: {
     displayMode?: "full" | "branch" | "ancestors" | "descendants";
@@ -363,6 +364,7 @@ export interface CreateCanvasInput {
   title: string;
   description?: string | null;
   root_person_id?: string | null;
+  included_person_ids?: string[] | null;
   is_default?: boolean;
   settings?: Record<string, any>;
 }
@@ -371,6 +373,7 @@ export interface UpdateCanvasInput {
   title?: string;
   description?: string | null;
   root_person_id?: string | null;
+  included_person_ids?: string[] | null;
   custom_positions?: Record<string, { x: number; y: number }> | null;
   settings?: Record<string, any>;
   is_default?: boolean;
