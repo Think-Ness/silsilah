@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { Canvas, PersonWithPortrait } from "@/types/genealogy";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { DeleteCanvasDialog } from "@/components/genealogy/DeleteCanvasDialog";
 
 export interface CanvasDashboardProps {
   canvases: Canvas[];
@@ -40,6 +41,15 @@ export function CanvasDashboard({
   onDeleteCanvas,
 }: CanvasDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    canvasId: string | null;
+    canvasTitle: string;
+  }>({
+    open: false,
+    canvasId: null,
+    canvasTitle: "",
+  });
 
   const filteredCanvases = useMemo(() => {
     return canvases.filter((c) => {
@@ -143,11 +153,11 @@ export function CanvasDashboard({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (
-                            confirm(`Apakah Anda yakin ingin menghapus kanvas "${canvas.title}"?`)
-                          ) {
-                            onDeleteCanvas(canvas.id);
-                          }
+                          setDeleteDialog({
+                            open: true,
+                            canvasId: canvas.id,
+                            canvasTitle: canvas.title,
+                          });
                         }}
                         className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all"
                         title="Hapus Kanvas"
@@ -253,6 +263,19 @@ export function CanvasDashboard({
           </button>
         </div>
       </div>
+
+      {/* Delete Canvas Dialog UI */}
+      <DeleteCanvasDialog
+        open={deleteDialog.open}
+        canvasId={deleteDialog.canvasId}
+        canvasTitle={deleteDialog.canvasTitle}
+        onClose={() => setDeleteDialog({ open: false, canvasId: null, canvasTitle: "" })}
+        onSuccess={() => {
+          if (onDeleteCanvas && deleteDialog.canvasId) {
+            onDeleteCanvas(deleteDialog.canvasId);
+          }
+        }}
+      />
     </div>
   );
 }

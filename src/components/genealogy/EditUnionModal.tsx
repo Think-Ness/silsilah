@@ -88,11 +88,9 @@ export function EditUnionModal({
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Hapus hubungan pernikahan antara ${p1Name} & ${p2Name}? Hubungan ini akan dilepas dari pohon silsilah.`)) {
-      return;
-    }
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const handleDelete = async () => {
     setDeleting(true);
     try {
       await deleteUnion(union.id);
@@ -111,6 +109,7 @@ export function EditUnionModal({
       toast.error(err.message || "Gagal menghapus hubungan");
     } finally {
       setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -340,45 +339,74 @@ export function EditUnionModal({
           </div>
 
           {/* Action Buttons Footer - Sticky */}
-          <div className="flex items-center justify-between p-4 sm:px-6 border-t border-[var(--border)] bg-[var(--surface)] flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting || saving}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-            >
-              {deleting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="w-3.5 h-3.5" />
-              )}
-              <span>Hapus Hubungan</span>
-            </button>
+          <div className="p-4 sm:px-6 border-t border-[var(--border)] bg-[var(--surface)] flex-shrink-0">
+            {showDeleteConfirm ? (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40">
+                <div className="text-xs text-red-700 dark:text-red-300 font-medium text-center sm:text-left">
+                  Yakin ingin melepas hubungan pernikahan ini?
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={deleting}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--subtle)] transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-xs transition-colors disabled:opacity-50"
+                  >
+                    {deleting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>Ya, Hapus</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={deleting || saving}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Hubungan</span>
+                </button>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving || deleting}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={saving || deleting}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-colors disabled:opacity-50"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Menyimpan...</span>
-                  </>
-                ) : (
-                  <span>Simpan Perubahan</span>
-                )}
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={saving || deleting}
+                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || deleting}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-colors disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <span>Simpan Perubahan</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </form>
       </div>
