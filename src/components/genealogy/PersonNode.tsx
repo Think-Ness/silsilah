@@ -157,9 +157,10 @@ export const PersonNode = memo(function PersonNode({
     };
   }, []);
 
-  const { isViewer, isSuperAdmin } = useCurrentUser();
-  const nodeCanEdit = (data as any)?.canEdit !== undefined ? (data as any).canEdit : !isViewer;
-  const showActions = nodeCanEdit && !isViewer && (isHovered || !!selected);
+  const { user, isViewer, isSuperAdmin } = useCurrentUser();
+  const currentUserId = user?.id;
+  const nodeCanEdit = Boolean((data as any)?.canEdit);
+  const showActions = nodeCanEdit && (isHovered || !!selected);
 
   const handleQuickAdd = (
     e: React.MouseEvent,
@@ -635,16 +636,18 @@ export const PersonNode = memo(function PersonNode({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={handleOpenCreateCanvas}
-          title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
-          aria-label="Buat Kanvas Silsilah"
-          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
-        >
-          <Layers className="w-3 h-3 text-cyan-300" />
-          <span>+ Kanvas</span>
-        </button>
+        {(isSuperAdmin || (Boolean(currentUserId) && person.created_by === currentUserId)) && (
+          <button
+            type="button"
+            onClick={handleOpenCreateCanvas}
+            title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
+            aria-label="Buat Kanvas Silsilah"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
+          >
+            <Layers className="w-3 h-3 text-cyan-300" />
+            <span>+ Kanvas</span>
+          </button>
+        )}
       </div>
 
       {/* Connection handles */}

@@ -16,6 +16,8 @@ import { getAllPeople, getPersonProfile } from "@/lib/genealogy/people";
 import { getAllUnions, getAllParentChildRelationships } from "@/lib/genealogy/relationships";
 import { getAllCanvases, deleteCanvas, updateCanvas } from "@/lib/genealogy/canvases";
 import { createClient } from "@/lib/supabase/client";
+import { useCurrentUser } from "@/context/UserRoleContext";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LayoutGrid, Layers, Plus, Network, Edit3, Check, Users, Printer } from "lucide-react";
 import type { Canvas } from "@/types/genealogy";
@@ -52,6 +54,9 @@ async function getCanvasData() {
 }
 
 export default function FamilyTreePage() {
+  const { user, isSuperAdmin } = useCurrentUser();
+  const currentUserId = user?.id;
+
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   // Mode tampilan: dashboard galeri kanvas | kanvas interaktif | template bagan zuriat
   const [viewMode, setViewMode] = useState<"dashboard" | "canvas" | "zuriat">("dashboard");
@@ -102,9 +107,34 @@ export default function FamilyTreePage() {
 
   const isMobile = useIsMobile();
 
+  // Query daftar semua kanvas
+  const { data: canvasesData = [] } = useQuery({
+    queryKey: ["canvases-list"],
+    queryFn: () => getAllCanvases(),
+    staleTime: 10 * 1000,
+  });
+
+  // Kanvas aktif saat ini
+  const activeCanvas = useMemo(() => {
+    if (activeCanvasId && canvasesData.length > 0) {
+      const found = canvasesData.find((c) => c.id === activeCanvasId);
+      if (found) return found;
+    }
+    return canvasesData.find((c) => c.is_default) || canvasesData[0] || null;
+  }, [activeCanvasId, canvasesData]);
+
+  const isCanvasOwner = isSuperAdmin || (Boolean(currentUserId) && activeCanvas?.owner_id === currentUserId);
+  const isCanvasEditor = activeCanvas?.user_permission === "edit";
+  const canEditCanvas = isCanvasOwner || isCanvasEditor;
+
   // Listener untuk aksi tambah cepat, hapus anggota, dan atur urutan anak dari kanvas
   useEffect(() => {
     const handleQuickAddEvent = (e: Event) => {
+      if (!canEditCanvas) {
+        toast.error("Kanvas ini bersifat Hanya Baca (View Only). Anda tidak dapat menambah anggota di kanvas ini.");
+        return;
+      }
+
       const customEvent = e as CustomEvent<{
         targetPerson: any;
         actionType: QuickAddActionType;
@@ -121,6 +151,11 @@ export default function FamilyTreePage() {
     };
 
     const handleDeleteEvent = (e: Event) => {
+      if (!canEditCanvas && !isSuperAdmin) {
+        toast.error("Kanvas ini bersifat Hanya Baca (View Only). Anda tidak dapat menghapus anggota di kanvas ini.");
+        return;
+      }
+
       const customEvent = e as CustomEvent<{
         personId: string;
         personName: string;
@@ -135,6 +170,11 @@ export default function FamilyTreePage() {
     };
 
     const handleReorderEvent = (e: Event) => {
+      if (!canEditCanvas) {
+        toast.error("Kanvas ini bersifat Hanya Baca (View Only). Anda tidak dapat mengubah urutan anak di kanvas ini.");
+        return;
+      }
+
       const customEvent = e as CustomEvent<{
         parentId: string;
         parentName: string;
@@ -171,14 +211,7 @@ export default function FamilyTreePage() {
       window.removeEventListener("silsilah:reorder-children", handleReorderEvent);
       window.removeEventListener("silsilah:open-create-canvas", handleOpenCreateCanvas);
     };
-  }, []);
-
-  // Query daftar semua kanvas
-  const { data: canvasesData = [] } = useQuery({
-    queryKey: ["canvases-list"],
-    queryFn: () => getAllCanvases(),
-    staleTime: 10 * 1000,
-  });
+  }, [canEditCanvas, isSuperAdmin]);
 
   // Listener event update kanvas
   useEffect(() => {
@@ -193,15 +226,6 @@ export default function FamilyTreePage() {
     window.addEventListener("silsilah:canvases-updated", handleCanvasesUpdated);
     return () => window.removeEventListener("silsilah:canvases-updated", handleCanvasesUpdated);
   }, [queryClient]);
-
-  // Kanvas aktif saat ini
-  const activeCanvas = useMemo(() => {
-    if (activeCanvasId && canvasesData.length > 0) {
-      const found = canvasesData.find((c) => c.id === activeCanvasId);
-      if (found) return found;
-    }
-    return canvasesData.find((c) => c.is_default) || canvasesData[0] || null;
-  }, [activeCanvasId, canvasesData]);
 
   // Sync title input saat kanvas aktif berganti
   useEffect(() => {
@@ -632,46 +656,48 @@ export default function FamilyTreePage() {
               onDeleteCanvas={handleDeleteCanvas}
             />
 
-            {isEditingTitle ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSaveTitleInput();
-                }}
-                style={{ display: "flex", alignItems: "center", gap: "6px" }}
-              >
-                <input
-                  type="text"
-                  value={titleInput}
-                  onChange={(e) => setTitleInput(e.target.value)}
-                  autoFocus
-                  onBlur={handleSaveTitleInput}
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    border: "1px solid var(--accent-color)",
-                    borderRadius: "6px",
-                    padding: "4px 10px",
-                    outline: "none",
-                    minWidth: "220px",
+            {canEditCanvas && (
+              isEditingTitle ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSaveTitleInput();
                   }}
-                />
-                <button
-                  type="submit"
-                  className="p-1 rounded hover:bg-emerald-100 text-emerald-700 transition-colors"
-                  title="Simpan Judul"
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
                 >
-                  <Check className="w-4 h-4" />
+                  <input
+                    type="text"
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    autoFocus
+                    onBlur={handleSaveTitleInput}
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      border: "1px solid var(--accent-color)",
+                      borderRadius: "6px",
+                      padding: "4px 10px",
+                      outline: "none",
+                      minWidth: "220px",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    className="p-1 rounded hover:bg-emerald-100 text-emerald-700 transition-colors"
+                    title="Simpan Judul"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                </form>
+              ) : (
+                <button
+                  onClick={() => setIsEditingTitle(true)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Ubah Nama Kanvas Ini"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
                 </button>
-              </form>
-            ) : (
-              <button
-                onClick={() => setIsEditingTitle(true)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                title="Ubah Nama Kanvas Ini"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
+              )
             )}
           </div>
         ) : (
@@ -777,6 +803,7 @@ export default function FamilyTreePage() {
               <PersonDetailPanel
                 profile={selectedProfile}
                 onClose={handlePanelClose}
+                canEdit={canEditCanvas}
               />
             ) : profileLoading ? (
               <div className="profile-panel" style={{ padding: "20px" }}>
@@ -800,6 +827,7 @@ export default function FamilyTreePage() {
           <PersonBottomSheet
             profile={selectedProfile}
             onClose={handlePanelClose}
+            canEdit={canEditCanvas}
           />
         )}
       </div>

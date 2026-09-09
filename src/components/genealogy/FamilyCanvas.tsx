@@ -27,6 +27,7 @@ import { updateChildOrder } from "@/lib/genealogy/relationships";
 import { saveCanvasIncludedPersons, saveCanvasPositions } from "@/lib/genealogy/canvases";
 import { Search, UserPlus, X, Check, Download, Users, Plus, Eye } from "lucide-react";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { useCurrentUser } from "@/context/UserRoleContext";
 import type {
   PersonWithPortrait,
   Union,
@@ -76,9 +77,20 @@ function CanvasInner({
   const [importSearchTerm, setImportSearchTerm] = useState("");
   const { fitView } = useReactFlow();
 
+  const { user, isSuperAdmin } = useCurrentUser();
+  const currentUserId = user?.id;
+
   const isDefaultCanvas = canvasId === "default-canvas" || canvasData?.is_default === true;
-  const userPermission = canvasData?.user_permission || "owner";
-  const canEdit = userPermission !== "view";
+  
+  // Hak akses kanvas:
+  // - Super Admin: owner
+  // - Pemilik kanvas (owner_id === currentUserId): owner
+  // - User dengan share 'edit': edit
+  // - Selain itu: view (read-only)
+  const isCanvasOwner = isSuperAdmin || (Boolean(currentUserId) && canvasData?.owner_id === currentUserId);
+  const isCanvasEditor = canvasData?.user_permission === "edit";
+  const canEdit = isCanvasOwner || isCanvasEditor;
+  const userPermission = isCanvasOwner ? "owner" : isCanvasEditor ? "edit" : "view";
 
   // Inisialisasi daftar person ID yang masuk ke kanvas ini
   const [includedPersonIds, setIncludedPersonIds] = useState<string[] | null>(() => {

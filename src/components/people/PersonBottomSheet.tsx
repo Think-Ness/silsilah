@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/context/UserRoleContext";
 interface PersonBottomSheetProps {
   profile: PersonProfile;
   onClose: () => void;
+  canEdit?: boolean;
 }
 
 function getDisplayName(p: { prefix_title?: string | null; display_name?: string | null; full_name: string; suffix_title?: string | null }): string {
@@ -20,8 +21,12 @@ function getDisplayName(p: { prefix_title?: string | null; display_name?: string
   return parts.join(" ");
 }
 
-export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) {
-  const { isViewer, canEdit, canDelete } = useCurrentUser();
+export function PersonBottomSheet({ profile, onClose, canEdit: canEditProp }: PersonBottomSheetProps) {
+  const { user, isSuperAdmin, canDelete } = useCurrentUser();
+  const currentUserId = user?.id;
+
+  const isOwner = isSuperAdmin || (Boolean(currentUserId) && (!profile.created_by || profile.created_by === currentUserId));
+  const effectiveCanEdit = canEditProp !== undefined ? (canEditProp && isOwner) : isOwner;
   const displayName = getDisplayName(profile);
   const primaryAddress = profile.addresses.find((a) => a.is_current) || profile.addresses[0];
   const isDeceased = profile.life_status === "deceased";
@@ -110,8 +115,8 @@ export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) 
             </div>
           </div>
 
-          {/* Quick Relationship Actions for Mobile (Tanpa perlu hover) — Tersembunyi untuk Viewer */}
-          {!isViewer && (
+          {/* Quick Relationship Actions for Mobile — Hanya jika pengguna memiliki izin edit */}
+          {effectiveCanEdit && (
             <div className="bg-[var(--subtle)]/60 p-3 rounded-xl border border-[var(--border)]">
               <div className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">
                 Tambah Relasi Cepat
@@ -226,9 +231,9 @@ export function PersonBottomSheet({ profile, onClose }: PersonBottomSheetProps) 
             <ArrowRight className="w-4 h-4" />
           </Link>
 
-          {(canEdit || canDelete) && (
+          {(effectiveCanEdit || canDelete) && (
             <div className="flex gap-2">
-              {canEdit && (
+              {effectiveCanEdit && (
                 <Link
                   href={`/people/${profile.id}/edit`}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--foreground)] hover:bg-[var(--subtle)] transition-colors"

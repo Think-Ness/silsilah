@@ -9,6 +9,7 @@ import { useCurrentUser } from "@/context/UserRoleContext";
 interface PersonDetailPanelProps {
   profile: PersonProfile;
   onClose: () => void;
+  canEdit?: boolean;
 }
 
 function getDisplayName(p: { prefix_title?: string | null; display_name?: string | null; full_name: string; suffix_title?: string | null }): string {
@@ -19,8 +20,12 @@ function getDisplayName(p: { prefix_title?: string | null; display_name?: string
   return parts.join(" ");
 }
 
-export function PersonDetailPanel({ profile, onClose }: PersonDetailPanelProps) {
-  const { canEdit, canDelete } = useCurrentUser();
+export function PersonDetailPanel({ profile, onClose, canEdit: canEditProp }: PersonDetailPanelProps) {
+  const { user, isSuperAdmin, canDelete } = useCurrentUser();
+  const currentUserId = user?.id;
+
+  const isOwner = isSuperAdmin || (Boolean(currentUserId) && (!profile.created_by || profile.created_by === currentUserId));
+  const canEdit = canEditProp !== undefined ? (canEditProp && isOwner) : isOwner;
   const displayName = getDisplayName(profile);
   const primaryAddress = profile.addresses.find((a) => a.is_current) || profile.addresses[0];
   const whatsapp = profile.contacts.find((c) => c.contact_type === "whatsapp");
