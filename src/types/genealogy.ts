@@ -336,9 +336,20 @@ export interface CreateParentChildInput {
   notes?: string;
 }
 
-// ============================================================
-// CANVAS ENTITIES (Multi-Canvas / POV Silsilah)
-// ============================================================
+export interface CanvasShare {
+  id: string;
+  canvas_id: string;
+  user_id: string;
+  permission: "view" | "edit";
+  shared_by?: string | null;
+  created_at: string;
+  user_profile?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    email?: string | null;
+  } | null;
+}
 
 export interface Canvas {
   id: string;
@@ -355,6 +366,9 @@ export interface Canvas {
     [key: string]: any;
   } | null;
   is_default: boolean;
+  owner_id?: string | null;
+  is_public?: boolean;
+  user_permission?: "owner" | "edit" | "view";
   created_at: string;
   updated_at: string;
   created_by?: string | null;
@@ -366,6 +380,7 @@ export interface CreateCanvasInput {
   root_person_id?: string | null;
   included_person_ids?: string[] | null;
   is_default?: boolean;
+  is_public?: boolean;
   settings?: Record<string, any>;
 }
 
@@ -377,5 +392,7 @@ export interface UpdateCanvasInput {
   custom_positions?: Record<string, { x: number; y: number }> | null;
   settings?: Record<string, any>;
   is_default?: boolean;
+  is_public?: boolean;
 }
+
 

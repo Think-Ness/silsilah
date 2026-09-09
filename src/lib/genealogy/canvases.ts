@@ -1,13 +1,13 @@
 // ============================================================
-// Genealogy Domain Layer — Canvases Service (Multi-Canvas)
+// Genealogy Domain Layer — Canvases Service (Multi-Canvas & Sharing)
 // ============================================================
 
 import { createClient } from "@/lib/supabase/client";
 import type {
   Canvas,
+  CanvasShare,
   CreateCanvasInput,
   UpdateCanvasInput,
-  PersonWithPortrait,
 } from "@/types/genealogy";
 
 const supabase = createClient();
@@ -41,11 +41,14 @@ function saveLocalCanvases(canvases: Canvas[]) {
   }
 }
 
-/** Ambil semua daftar kanvas */
+/** Ambil semua daftar kanvas yang dapat diakses oleh user saat ini */
 export async function getAllCanvases(client?: any): Promise<Canvas[]> {
   const sb = getClient(client);
 
   try {
+    const { data: userData } = await sb.auth.getUser();
+    const currentUserId = userData?.user?.id;
+
     const { data, error } = await sb
       .from("canvases")
       .select(`
@@ -58,7 +61,35 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
       .order("created_at", { ascending: true });
 
     if (!error && data && data.length > 0) {
-      const dbCanvases = data as Canvas[];
+      // Ambil shares info untuk user saat ini jika login
+      let sharesMap = new Map<string, "edit" | "view">();
+      if (currentUserId) {
+        const { data: sharesData } = await sb
+          .from("canvas_shares")
+          .select("canvas_id, permission")
+          .eq("user_id", currentUserId);
+
+        if (sharesData) {
+          for (const s of sharesData) {
+            sharesMap.set(s.canvas_id, s.permission as "edit" | "view");
+          }
+        }
+      }
+
+      const dbCanvases = (data as any[]).map((c) => {
+        let user_permission: "owner" | "edit" | "view" = "view";
+        if (!c.owner_id || c.owner_id === currentUserId) {
+          user_permission = "owner";
+        } else if (sharesMap.has(c.id)) {
+          user_permission = sharesMap.get(c.id)!;
+        }
+
+        return {
+          ...c,
+          user_permission,
+        } as Canvas;
+      });
+
       saveLocalCanvases(dbCanvases);
       return dbCanvases;
     }
@@ -79,6 +110,7 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
     description: "Pohon silsilah dan dokumentasi garis keturunan keluarga besar.",
     root_person_id: null,
     is_default: false,
+    user_permission: "owner",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -92,6 +124,9 @@ export async function getCanvas(id: string, client?: any): Promise<Canvas | null
   const sb = getClient(client);
 
   try {
+    const { data: userData } = await sb.auth.getUser();
+    const currentUserId = userData?.user?.id;
+
     const { data, error } = await sb
       .from("canvases")
       .select(`
@@ -105,7 +140,26 @@ export async function getCanvas(id: string, client?: any): Promise<Canvas | null
       .single();
 
     if (!error && data) {
-      return data as Canvas;
+      let user_permission: "owner" | "edit" | "view" = "view";
+      if (!data.owner_id || data.owner_id === currentUserId) {
+        user_permission = "owner";
+      } else if (currentUserId) {
+        const { data: shareData } = await sb
+          .from("canvas_shares")
+          .select("permission")
+          .eq("canvas_id", id)
+          .eq("user_id", currentUserId)
+          .single();
+
+        if (shareData) {
+          user_permission = shareData.permission as "edit" | "view";
+        }
+      }
+
+      return {
+        ...data,
+        user_permission,
+      } as Canvas;
     }
   } catch (err) {
     console.warn("Get canvas Supabase failed, searching local fallback:", err);
@@ -121,6 +175,8 @@ export async function createCanvas(
   client?: any
 ): Promise<Canvas> {
   const sb = getClient(client);
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id || null;
 
   const newCanvasId =
     typeof crypto !== "undefined" && crypto.randomUUID
@@ -139,10 +195,14 @@ export async function createCanvas(
         ? [input.root_person_id]
         : null,
     is_default: input.is_default ?? false,
+    owner_id: currentUserId,
+    is_public: input.is_public ?? false,
+    user_permission: "owner",
     settings: input.settings || { displayMode: "branch" },
     custom_positions: {},
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    created_by: currentUserId,
   };
 
   let createdCanvas: Canvas = payload;
@@ -156,8 +216,11 @@ export async function createCanvas(
         root_person_id: payload.root_person_id,
         included_person_ids: payload.included_person_ids,
         is_default: payload.is_default,
+        owner_id: currentUserId,
+        is_public: payload.is_public,
         settings: payload.settings,
         custom_positions: payload.custom_positions,
+        created_by: currentUserId,
       })
       .select(`
         *,
@@ -169,7 +232,10 @@ export async function createCanvas(
       .single();
 
     if (!error && data) {
-      createdCanvas = data as Canvas;
+      createdCanvas = {
+        ...data,
+        user_permission: "owner",
+      } as Canvas;
     }
   } catch (err) {
     console.warn("Supabase insert canvas failed, stored locally:", err);
@@ -213,6 +279,7 @@ export async function updateCanvas(
   if (input.custom_positions !== undefined) updatePayload.custom_positions = input.custom_positions;
   if (input.settings !== undefined) updatePayload.settings = input.settings;
   if (input.is_default !== undefined) updatePayload.is_default = input.is_default;
+  if (input.is_public !== undefined) updatePayload.is_public = input.is_public;
 
   let resultCanvas: Canvas | null = null;
 
@@ -348,4 +415,97 @@ export async function deleteCanvas(id: string, client?: any): Promise<boolean> {
   }
 
   return true;
+}
+
+// ============================================================
+// CANVAS SHARING APIS
+// ============================================================
+
+/** Ambil daftar share untuk kanvas tertentu */
+export async function getCanvasShares(canvasId: string, client?: any): Promise<CanvasShare[]> {
+  const sb = getClient(client);
+
+  try {
+    const { data, error } = await sb
+      .from("canvas_shares")
+      .select(`
+        *,
+        user_profile:profiles!canvas_shares_user_id_fkey(id, full_name, avatar_url)
+      `)
+      .eq("canvas_id", canvasId)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      return data as CanvasShare[];
+    }
+  } catch (err) {
+    console.warn("Failed to get canvas shares:", err);
+  }
+
+  return [];
+}
+
+/** Bagikan kanvas ke user via email menggunakan Supabase RPC */
+export async function shareCanvasByEmail(
+  canvasId: string,
+  email: string,
+  permission: "view" | "edit" = "view",
+  client?: any
+): Promise<{ success: boolean; error?: string; data?: any }> {
+  const sb = getClient(client);
+
+  try {
+    const { data, error } = await sb.rpc("share_canvas_by_email", {
+      p_canvas_id: canvasId,
+      p_email: email.trim().toLowerCase(),
+      p_permission: permission,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data && !data.success) {
+      return { success: false, error: data.error };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Gagal membagikan kanvas" };
+  }
+}
+
+/** Hapus izin share kanvas */
+export async function removeCanvasShare(shareId: string, client?: any): Promise<boolean> {
+  const sb = getClient(client);
+
+  try {
+    const { error } = await sb.from("canvas_shares").delete().eq("id", shareId);
+    if (!error) return true;
+  } catch (err) {
+    console.warn("Failed to delete canvas share:", err);
+  }
+
+  return false;
+}
+
+/** Update izin share kanvas (view / edit) */
+export async function updateCanvasShare(
+  shareId: string,
+  permission: "view" | "edit",
+  client?: any
+): Promise<boolean> {
+  const sb = getClient(client);
+
+  try {
+    const { error } = await sb
+      .from("canvas_shares")
+      .update({ permission })
+      .eq("id", shareId);
+    if (!error) return true;
+  } catch (err) {
+    console.warn("Failed to update canvas share:", err);
+  }
+
+  return false;
 }

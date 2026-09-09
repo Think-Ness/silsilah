@@ -24,7 +24,7 @@ import { EditUnionModal } from "./EditUnionModal";
 import { buildCanvasGraph } from "@/lib/genealogy/canvas";
 import { runElkLayout } from "@/lib/layout/elkLayout";
 import { updateChildOrder } from "@/lib/genealogy/relationships";
-import { saveCanvasIncludedPersons } from "@/lib/genealogy/canvases";
+import { saveCanvasIncludedPersons, saveCanvasPositions } from "@/lib/genealogy/canvases";
 import { Search, UserPlus, X, Check, Download, Users, Plus } from "lucide-react";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import type {

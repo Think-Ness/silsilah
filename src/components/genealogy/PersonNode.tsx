@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import {
   User,
   UserPlus,
@@ -19,9 +19,8 @@ import type { PersonNodeData } from "@/lib/genealogy/canvas";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import { useCurrentUser } from "@/context/UserRoleContext";
 
-interface PersonNodeProps extends NodeProps {
-  data: PersonNodeData;
-}
+type PersonNodeType = Node<PersonNodeData, "personNode">;
+type PersonNodeProps = NodeProps<PersonNodeType>;
 
 function getDisplayName(person: PersonNodeData["person"]): string {
   const parts: string[] = [];

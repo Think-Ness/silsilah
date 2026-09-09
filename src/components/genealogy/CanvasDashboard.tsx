@@ -8,18 +8,20 @@ import {
   ArrowRight,
   Printer,
   Trash2,
-  Edit2,
-  Calendar,
   Users,
-  Crown,
   Network,
-  GitBranch,
-  CheckCircle2,
+  Share2,
+  ShieldCheck,
+  Eye,
+  Edit3,
   Sparkles,
+  FolderOpen,
 } from "lucide-react";
 import type { Canvas, PersonWithPortrait } from "@/types/genealogy";
 import { getMediaUrl } from "@/lib/genealogy/media";
 import { DeleteCanvasDialog } from "@/components/genealogy/DeleteCanvasDialog";
+import { ShareCanvasDialog } from "@/components/genealogy/ShareCanvasDialog";
+import { useCurrentUser } from "@/context/UserRoleContext";
 
 export interface CanvasDashboardProps {
   canvases: Canvas[];
@@ -40,6 +42,10 @@ export function CanvasDashboard({
   onEditCanvas,
   onDeleteCanvas,
 }: CanvasDashboardProps) {
+  const { user, isSuperAdmin, isViewer } = useCurrentUser();
+  const currentUserId = user?.id;
+
+  const [activeTab, setActiveTab] = useState<"all" | "my" | "shared">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -51,15 +57,52 @@ export function CanvasDashboard({
     canvasTitle: "",
   });
 
+  const [shareDialog, setShareDialog] = useState<{
+    open: boolean;
+    canvas: Canvas | null;
+  }>({
+    open: false,
+    canvas: null,
+  });
+
+  // Categorize counts
+  const myCanvasesCount = useMemo(() => {
+    return canvases.filter(
+      (c) => c.user_permission === "owner" || !c.owner_id || c.owner_id === currentUserId
+    ).length;
+  }, [canvases, currentUserId]);
+
+  const sharedCanvasesCount = useMemo(() => {
+    return canvases.filter(
+      (c) =>
+        c.user_permission === "edit" ||
+        c.user_permission === "view" ||
+        (c.owner_id && c.owner_id !== currentUserId)
+    ).length;
+  }, [canvases, currentUserId]);
+
   const filteredCanvases = useMemo(() => {
     return canvases.filter((c) => {
+      // Tab filter
+      if (activeTab === "my") {
+        const isMy = c.user_permission === "owner" || !c.owner_id || c.owner_id === currentUserId;
+        if (!isMy) return false;
+      } else if (activeTab === "shared") {
+        const isShared =
+          (c.owner_id && c.owner_id !== currentUserId) ||
+          c.user_permission === "edit" ||
+          c.user_permission === "view";
+        if (!isShared) return false;
+      }
+
+      // Search filter
       const matchesSearch =
         c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.description && c.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (c.root_person && c.root_person.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
       return matchesSearch;
     });
-  }, [canvases, searchTerm]);
+  }, [canvases, activeTab, searchTerm, currentUserId]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 p-6 md:p-8">
@@ -70,13 +113,13 @@ export function CanvasDashboard({
             <div className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-emerald-100">
                 <Layers className="w-3.5 h-3.5" />
-                <span>Multi-Family Genealogy Canvases</span>
+                <span>Multi-Family Genealogy & Canvas Sharing</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
                 Dashboard Kanvas Silsilah
               </h1>
               <p className="text-sm text-emerald-100/90 leading-relaxed">
-                Kelola berbagai kanvas silsilah keluarga dalam satu tempat. Buka kanvas keluarga yang sudah ada atau buat kanvas baru untuk berbagai cabang dan silsilah keluarga.
+                Kelola berbagai kanvas silsilah keluarga dalam satu tempat. Buka kanvas keluarga Anda, kolaborasi dengan anggota keluarga lain, atau buat kanvas baru untuk cabang keluarga lainnya.
               </p>
             </div>
 
@@ -97,12 +140,59 @@ export function CanvasDashboard({
           <div className="absolute right-1/3 -top-16 w-48 h-48 rounded-full bg-teal-300/10 blur-2xl pointer-events-none" />
         </div>
 
-        {/* Stats & Search Input */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Daftar Kanvas ({canvases.length})
-            </span>
+        {/* Navigation Tabs & Search */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "all"
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>Semua Kanvas</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-700 dark:bg-slate-200 text-slate-200 dark:text-slate-800">
+                {canvases.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("my")}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "my"
+                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Kanvas Saya</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-800/40 text-emerald-200">
+                {myCanvasesCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("shared")}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "shared"
+                  ? "bg-teal-600 text-white shadow-sm shadow-teal-600/30"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Dibagikan ke Saya</span>
+              {sharedCanvasesCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-teal-800/40 text-teal-200">
+                  {sharedCanvasesCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Search Input */}
@@ -123,6 +213,20 @@ export function CanvasDashboard({
           {filteredCanvases.map((canvas) => {
             const rootPerson = canvas.root_person;
             const isCurrentlyActive = canvas.id === activeCanvasId;
+            const isOwner =
+              isSuperAdmin ||
+              canvas.user_permission === "owner" ||
+              !canvas.owner_id ||
+              canvas.owner_id === currentUserId;
+
+            const isShared = !isOwner && canvas.owner_id && canvas.owner_id !== currentUserId;
+            const permissionBadge = isOwner
+              ? { label: "Pemilik", icon: ShieldCheck, color: "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" }
+              : canvas.user_permission === "edit"
+              ? { label: "Editor", icon: Edit3, color: "text-sky-700 bg-sky-50 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800" }
+              : { label: "Viewer", icon: Eye, color: "text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700" };
+
+            const BadgeIcon = permissionBadge.icon;
 
             return (
               <div
@@ -134,37 +238,58 @@ export function CanvasDashboard({
                 }`}
               >
                 <div className="space-y-4">
-                  {/* Top Bar: Icon & Delete */}
+                  {/* Top Bar: Icon, Role Badge, Share & Delete */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="h-11 w-11 rounded-2xl flex items-center justify-center font-bold text-base shadow-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20">
                         <Layers className="w-5 h-5" />
                       </div>
 
-                      <div>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
-                          Kanvas Silsilah
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${permissionBadge.color}`}
+                        >
+                          <BadgeIcon className="w-3 h-3" />
+                          <span>{permissionBadge.label}</span>
                         </span>
                       </div>
                     </div>
 
-                    {onDeleteCanvas && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteDialog({
-                            open: true,
-                            canvasId: canvas.id,
-                            canvasTitle: canvas.title,
-                          });
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all"
-                        title="Hapus Kanvas"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {/* Share Button (Owner or Super Admin) */}
+                      {isOwner && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShareDialog({ open: true, canvas });
+                          }}
+                          className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all"
+                          title="Bagikan Kanvas Ini ke Pengguna Lain"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {/* Delete Button (Owner or Super Admin) */}
+                      {onDeleteCanvas && isOwner && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteDialog({
+                              open: true,
+                              canvasId: canvas.id,
+                              canvasTitle: canvas.title,
+                            });
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all"
+                          title="Hapus Kanvas"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Title & Description */}
@@ -263,6 +388,13 @@ export function CanvasDashboard({
           </button>
         </div>
       </div>
+
+      {/* Share Canvas Dialog */}
+      <ShareCanvasDialog
+        open={shareDialog.open}
+        canvas={shareDialog.canvas}
+        onClose={() => setShareDialog({ open: false, canvas: null })}
+      />
 
       {/* Delete Canvas Dialog UI */}
       <DeleteCanvasDialog

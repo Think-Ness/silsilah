@@ -30,6 +30,8 @@ export interface PersonNodeData {
     | "nephew_niece"
     | "descendant";
   roleLabel: string;
+  childOrderLabel?: string | null;
+  childrenCount?: number | null;
   parentsNames?: string[];
   generation: number;
   isHighlighted?: boolean;
@@ -376,9 +378,9 @@ export function calculateFamilyTreePositions(
 
     while (curPId && !seenAncestors.has(curPId)) {
       seenAncestors.add(curPId);
-      const parentIds = childToParents.get(curPId) || [];
+      const parentIds: string[] = childToParents.get(curPId) || [];
       if (parentIds.length > 0) {
-        const pUnit = familyUnits.find(
+        const pUnit: FamilyUnit | undefined = familyUnits.find(
           (u) =>
             u.primaryPerson.id === parentIds[0] ||
             u.spouses.some((s) => s.spouse.id === parentIds[0])
