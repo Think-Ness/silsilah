@@ -31,6 +31,88 @@ function getDisplayName(person: PersonNodeData["person"]): string {
   return parts.join(" ");
 }
 
+interface GhostCardProps {
+  person: PersonNodeData["person"];
+  label?: string;
+  theme: "blue" | "sky" | "amber" | "emerald";
+}
+
+function GhostCard({ person, label, theme }: GhostCardProps) {
+  const isDeceased = person.life_status === "deceased";
+  const rawName = [person.prefix_title, person.display_name || person.full_name].filter(Boolean).join(" ");
+  const name = isDeceased ? `${rawName} ${person.gender === "female" ? "(Almh)" : "(Alm)"}` : rawName;
+
+  const styles = {
+    blue: {
+      border: "border-blue-400 dark:border-blue-500",
+      bg: "bg-blue-50/95 dark:bg-blue-950/90",
+      badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200 border-blue-200 dark:border-blue-800",
+      shadow: "shadow-blue-500/25",
+      text: "text-blue-600 dark:text-blue-400",
+    },
+    sky: {
+      border: "border-sky-400 dark:border-sky-500",
+      bg: "bg-sky-50/95 dark:bg-sky-950/90",
+      badge: "bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-200 border-sky-200 dark:border-sky-800",
+      shadow: "shadow-sky-500/25",
+      text: "text-sky-600 dark:text-sky-400",
+    },
+    amber: {
+      border: "border-amber-400 dark:border-amber-500",
+      bg: "bg-amber-50/95 dark:bg-amber-950/90",
+      badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border-amber-200 dark:border-amber-800",
+      shadow: "shadow-amber-500/25",
+      text: "text-amber-600 dark:text-amber-400",
+    },
+    emerald: {
+      border: "border-emerald-400 dark:border-emerald-500",
+      bg: "bg-emerald-50/95 dark:bg-emerald-950/90",
+      badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800",
+      shadow: "shadow-emerald-500/25",
+      text: "text-emerald-600 dark:text-emerald-400",
+    },
+  }[theme];
+
+  return (
+    <div
+      className={`w-[220px] min-h-[90px] p-2.5 rounded-2xl border-2 border-dashed ${styles.border} ${styles.bg} backdrop-blur-md shadow-2xl ${styles.shadow} flex flex-col gap-1.5 pointer-events-none animate-in fade-in zoom-in-95 duration-150 relative z-50`}
+    >
+      <div className="flex items-center justify-between">
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${styles.badge} flex items-center gap-1`}>
+          <Sparkles className="w-2.5 h-2.5" />
+          <span>{label || (person.gender === "female" ? "Ibu Kandung" : "Ayah Kandung")}</span>
+        </span>
+        <span className="text-[10px] font-bold text-slate-400">
+          {person.gender === "female" ? "♀" : "♂"}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 mt-0.5">
+        <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-200/60 dark:bg-slate-800/60 flex-shrink-0 flex items-center justify-center font-bold text-xs border border-dashed border-slate-300 dark:border-slate-700">
+          {person.portrait ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={getMediaUrl(person.portrait.storage_path)}
+              alt={name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <User size={16} className={styles.text} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+            {name}
+          </p>
+          <p className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
+            Klik tombol untuk memasukkan
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const PersonNode = memo(function PersonNode({
   data,
   selected,
@@ -48,6 +130,7 @@ export const PersonNode = memo(function PersonNode({
   } = data;
 
   const [isHovered, setIsHovered] = useState(false);
+  const [hoveredSnapshot, setHoveredSnapshot] = useState<"parents" | "siblings" | "spouses" | "children" | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
@@ -282,6 +365,69 @@ export const PersonNode = memo(function PersonNode({
       role="button"
       aria-label={`${displayName}`}
     >
+      {/* Ghost Preview Containers */}
+      {hoveredSnapshot === "parents" && availableSnapshots?.parents && availableSnapshots.parents.length > 0 && (
+        <div className="absolute bottom-[calc(100%+48px)] left-1/2 -translate-x-1/2 flex items-center gap-2.5 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
+          {availableSnapshots.parents.map((p) => (
+            <GhostCard
+              key={p.id}
+              person={p}
+              label={p.gender === "female" ? "Ibu Kandung" : "Ayah Kandung"}
+              theme="blue"
+            />
+          ))}
+        </div>
+      )}
+
+      {hoveredSnapshot === "siblings" && availableSnapshots?.siblings && availableSnapshots.siblings.length > 0 && (
+        <div className="absolute bottom-[calc(100%+48px)] left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
+          {availableSnapshots.siblings.slice(0, 2).map((p) => (
+            <GhostCard
+              key={p.id}
+              person={p}
+              label="Saudara Kandung"
+              theme="sky"
+            />
+          ))}
+          {availableSnapshots.siblings.length > 2 && (
+            <div className="px-3 py-2 rounded-2xl bg-sky-950/90 text-sky-200 text-xs font-bold shadow-2xl border-2 border-dashed border-sky-400 backdrop-blur-md flex items-center justify-center min-h-[90px]">
+              +{availableSnapshots.siblings.length - 2} Saudara
+            </div>
+          )}
+        </div>
+      )}
+
+      {hoveredSnapshot === "spouses" && availableSnapshots?.spouses && availableSnapshots.spouses.length > 0 && (
+        <div className="absolute left-[calc(100%+165px)] top-1/2 -translate-y-1/2 flex flex-col gap-2 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
+          {availableSnapshots.spouses.map((p) => (
+            <GhostCard
+              key={p.id}
+              person={p}
+              label={p.gender === "female" ? "Istri" : "Suami"}
+              theme="amber"
+            />
+          ))}
+        </div>
+      )}
+
+      {hoveredSnapshot === "children" && availableSnapshots?.children && availableSnapshots.children.length > 0 && (
+        <div className="absolute top-[calc(100%+48px)] left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
+          {availableSnapshots.children.slice(0, 2).map((p) => (
+            <GhostCard
+              key={p.id}
+              person={p}
+              label="Anak Kandung"
+              theme="emerald"
+            />
+          ))}
+          {availableSnapshots.children.length > 2 && (
+            <div className="px-3 py-2 rounded-2xl bg-emerald-950/90 text-emerald-200 text-xs font-bold shadow-2xl border-2 border-dashed border-emerald-400 backdrop-blur-md flex items-center justify-center min-h-[90px]">
+              +{availableSnapshots.children.length - 2} Anak
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Floating Action Buttons: Top (Ayah / Ibu / Snapshot Orang Tua & Saudara) */}
       <div
         onMouseEnter={handleMouseEnter}
@@ -294,12 +440,15 @@ export const PersonNode = memo(function PersonNode({
         {availableSnapshots?.parents && availableSnapshots.parents.length > 0 ? (
           <button
             type="button"
-            onClick={(e) =>
+            onMouseEnter={() => setHoveredSnapshot("parents")}
+            onMouseLeave={() => setHoveredSnapshot(null)}
+            onClick={(e) => {
+              setHoveredSnapshot(null);
               handleImportSnapshot(
                 e,
                 availableSnapshots.parents.map((p) => p.id)
-              )
-            }
+              );
+            }}
             title={`Masukkan data Orang Tua (${availableSnapshots.parents.map((p) => p.display_name || p.full_name).join(" & ")}) ke kanvas ini`}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-105 cursor-pointer border border-blue-400"
           >
@@ -339,12 +488,15 @@ export const PersonNode = memo(function PersonNode({
         {availableSnapshots?.siblings && availableSnapshots.siblings.length > 0 && (
           <button
             type="button"
-            onClick={(e) =>
+            onMouseEnter={() => setHoveredSnapshot("siblings")}
+            onMouseLeave={() => setHoveredSnapshot(null)}
+            onClick={(e) => {
+              setHoveredSnapshot(null);
               handleImportSnapshot(
                 e,
                 availableSnapshots.siblings.map((p) => p.id)
-              )
-            }
+              );
+            }}
             title={`Masukkan ${availableSnapshots.siblings.length} Saudara Kandung dari database ke kanvas ini`}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold shadow-lg shadow-sky-600/30 transition-all hover:scale-105 cursor-pointer border border-sky-400"
           >
@@ -390,12 +542,15 @@ export const PersonNode = memo(function PersonNode({
           {availableSnapshots?.spouses && availableSnapshots.spouses.length > 0 ? (
             <button
               type="button"
-              onClick={(e) =>
+              onMouseEnter={() => setHoveredSnapshot("spouses")}
+              onMouseLeave={() => setHoveredSnapshot(null)}
+              onClick={(e) => {
+                setHoveredSnapshot(null);
                 handleImportSnapshot(
                   e,
                   availableSnapshots.spouses.map((p) => p.id)
-                )
-              }
+                );
+              }}
               title={`Masukkan Pasangan (${availableSnapshots.spouses.map((p) => p.display_name || p.full_name).join(", ")}) ke kanvas`}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-lg shadow-amber-600/30 transition-all hover:scale-105 cursor-pointer border border-amber-400"
             >
@@ -429,12 +584,15 @@ export const PersonNode = memo(function PersonNode({
         {availableSnapshots?.children && availableSnapshots.children.length > 0 ? (
           <button
             type="button"
-            onClick={(e) =>
+            onMouseEnter={() => setHoveredSnapshot("children")}
+            onMouseLeave={() => setHoveredSnapshot(null)}
+            onClick={(e) => {
+              setHoveredSnapshot(null);
               handleImportSnapshot(
                 e,
                 availableSnapshots.children.map((p) => p.id)
-              )
-            }
+              );
+            }}
             title={`Masukkan ${availableSnapshots.children.length} Anak dari database ke kanvas ini`}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 cursor-pointer border border-emerald-400"
           >
