@@ -88,6 +88,12 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
       `)
       .order("created_at", { ascending: true });
 
+    if (error) {
+      console.warn("Supabase canvases query notice:", error);
+    }
+
+    let dbCanvases: Canvas[] = [];
+
     if (!error && data) {
       // Ambil shares info untuk user saat ini jika login
       let sharesMap = new Map<string, "edit" | "view">();
@@ -119,7 +125,7 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
         return false;
       });
 
-      const dbCanvases = visibleCanvases.map((c) => {
+      dbCanvases = visibleCanvases.map((c) => {
         let user_permission: "owner" | "edit" | "view" = "view";
         if (isSuperAdmin || (currentUserId && c.owner_id === currentUserId) || (isSigap && !c.owner_id)) {
           user_permission = "owner";
@@ -132,18 +138,81 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
           user_permission,
         } as Canvas;
       });
+    }
 
-      return dbCanvases;
+    // Merge dengan kanvas lokal (fallback jika offline / terjadi isu RLS sebelum migrasi di-run)
+    const localList = getLocalCanvases();
+    const localFiltered = localList.filter((c) => {
+      if (isSuperAdmin) return true;
+      if (isSigap) return !c.owner_id || c.owner_id === currentUserId;
+      if (currentUserId && c.owner_id === currentUserId) return true;
+      return !c.owner_id;
+    });
+
+    const dbIds = new Set(dbCanvases.map((c) => c.id));
+    const merged = [...dbCanvases];
+    for (const loc of localFiltered) {
+      if (!dbIds.has(loc.id)) {
+        merged.push({
+          ...loc,
+          user_permission: "owner",
+        });
+      }
+    }
+
+    if (merged.length > 0) {
+      return merged;
     }
   } catch (err) {
     console.warn("Supabase canvases query failed:", err);
   }
 
-  return [];
+  // Fallback ke local storage
+  const localList = getLocalCanvases();
+  if (localList.length > 0) return localList;
+
+  // Fallback default kanvas keluarga awal
+  return [
+    {
+      id: "default-canvas",
+      title: "Pohon Silsilah Keluarga",
+      description: "Pohon silsilah keluarga dan seluruh garis keturunan.",
+      root_person_id: null,
+      included_person_ids: null,
+      is_default: true,
+      owner_id: null,
+      is_public: true,
+      user_permission: "owner",
+      settings: { displayMode: "branch" },
+      custom_positions: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: null,
+    },
+  ];
 }
 
 /** Ambil satu kanvas berdasarkan ID */
 export async function getCanvas(id: string, client?: any): Promise<Canvas | null> {
+  if (id === "default-canvas") {
+    return {
+      id: "default-canvas",
+      title: "Pohon Silsilah Keluarga",
+      description: "Pohon silsilah keluarga dan seluruh garis keturunan.",
+      root_person_id: null,
+      included_person_ids: null,
+      is_default: true,
+      owner_id: null,
+      is_public: true,
+      user_permission: "owner",
+      settings: { displayMode: "branch" },
+      custom_positions: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: null,
+    };
+  }
+
   const sb = getClient(client);
 
   try {
