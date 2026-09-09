@@ -75,13 +75,35 @@ function personDisplayName(p: { prefix_title?: string | null; display_name?: str
   return parts || p.full_name;
 }
 
-/** Fetch all timeline events from the database */
+/** Fetch all timeline events from the database with user isolation */
 export async function getTimelineEvents(personId?: string): Promise<TimelineEvent[]> {
   const supabase = await createClient();
 
+  const { data: userData } = await supabase.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
   const events: TimelineEvent[] = [];
 
-  // Fetch all people with their portrait media
+  // Fetch people with their portrait media, filtered by user ownership
   let peopleQuery = supabase
     .from("people")
     .select("*, portrait:media!portrait_media_id(storage_path)")
@@ -89,6 +111,8 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
 
   if (personId) {
     peopleQuery = peopleQuery.eq("id", personId);
+  } else if (!isSuperAdmin && !isSigap && currentUserId) {
+    peopleQuery = peopleQuery.eq("created_by", currentUserId);
   }
 
   const { data: people } = await peopleQuery;
@@ -139,11 +163,16 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
   }
 
   // 3. Fetch unions (marriages & divorces)
-  const { data: unions } = await supabase
+  let unionsQuery = supabase
     .from("unions")
     .select("*")
-    .or("start_date.not.is.null,end_date.not.is.null")
-    .returns<Union[]>();
+    .or("start_date.not.is.null,end_date.not.is.null");
+
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    unionsQuery = unionsQuery.eq("created_by", currentUserId);
+  }
+
+  const { data: unions } = await unionsQuery.returns<Union[]>();
 
   // Fetch union members
   const { data: unionMembers } = await supabase
@@ -151,10 +180,16 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
     .select("*")
     .returns<UnionMember[]>();
 
-  const { data: allPeople } = await supabase
+  let allPeopleQuery = supabase
     .from("people")
     .select("id, full_name, display_name, prefix_title, suffix_title, gender, birth_date, portrait:media!portrait_media_id(storage_path)")
     .is("archived_at", null);
+
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    allPeopleQuery = allPeopleQuery.eq("created_by", currentUserId);
+  }
+
+  const { data: allPeople } = await allPeopleQuery;
 
   const peopleMap = new Map<string, any>(allPeople?.map((p) => [p.id, p]) ?? []);
 

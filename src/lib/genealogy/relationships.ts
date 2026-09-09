@@ -174,14 +174,48 @@ function getClient(client?: any) {
   return client || supabase;
 }
 
-/** Ambil semua unions */
+/** Ambil semua unions dengan isolasi kepemilikan user */
 export async function getAllUnions(client?: any): Promise<Union[]> {
   const sb = getClient(client);
-  const { data, error } = await sb
-    .from("unions")
-    .select("*")
-    .order("created_at");
 
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
+  // Jika Sigap, otomatis klaim data legacy unions yang created_by-nya masih NULL
+  if (isSigap && currentUserId) {
+    sb.from("unions")
+      .update({ created_by: currentUserId, updated_by: currentUserId })
+      .is("created_by", null)
+      .then(() => {});
+  }
+
+  let query = sb.from("unions").select("*").order("created_at");
+
+  // Isolasi data: jika user biasa, hanya ambil unions miliknya
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    query = query.eq("created_by", currentUserId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data as Union[]) || [];
 }
@@ -346,13 +380,48 @@ export async function getParentRelationships(
   return (data as ParentChildRelationship[]) || [];
 }
 
-/** Ambil semua parent-child relationships */
+/** Ambil semua parent-child relationships dengan isolasi kepemilikan user */
 export async function getAllParentChildRelationships(client?: any): Promise<ParentChildRelationship[]> {
   const sb = getClient(client);
-  const { data, error } = await sb
-    .from("parent_child_relationships")
-    .select("*");
 
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
+  // Jika Sigap, otomatis klaim data legacy parent_child_relationships yang created_by-nya masih NULL
+  if (isSigap && currentUserId) {
+    sb.from("parent_child_relationships")
+      .update({ created_by: currentUserId })
+      .is("created_by", null)
+      .then(() => {});
+  }
+
+  let query = sb.from("parent_child_relationships").select("*");
+
+  // Isolasi data: jika user biasa (bukan super_admin & bukan sigap), hanya ambil parent-child miliknya
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    query = query.eq("created_by", currentUserId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data as ParentChildRelationship[]) || [];
 }
@@ -408,16 +477,43 @@ export async function updateParentChildUnion(
   }
 }
 
-/** Ambil stats relationships */
+/** Ambil stats relationships dengan isolasi kepemilikan user */
 export async function getRelationshipStats(client?: any): Promise<{
   totalUnions: number;
   totalParentChild: number;
 }> {
   const sb = getClient(client);
-  const [unionsRes, pcrRes] = await Promise.all([
-    sb.from("unions").select("id", { count: "exact", head: true }),
-    sb.from("parent_child_relationships").select("id", { count: "exact", head: true }),
-  ]);
+  const { data: userData } = await sb.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  let isSigap = false;
+  if (currentUserId) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (profile?.role === "super_admin") {
+      isSuperAdmin = true;
+    }
+    const fullName = (profile?.full_name || "").toLowerCase();
+    const email = (userData?.user?.email || "").toLowerCase();
+    if (fullName.includes("sigap") || email.includes("sigap")) {
+      isSigap = true;
+    }
+  }
+
+  let unionsQuery = sb.from("unions").select("id", { count: "exact", head: true });
+  let pcrQuery = sb.from("parent_child_relationships").select("id", { count: "exact", head: true });
+
+  if (!isSuperAdmin && !isSigap && currentUserId) {
+    unionsQuery = unionsQuery.eq("created_by", currentUserId);
+    pcrQuery = pcrQuery.eq("created_by", currentUserId);
+  }
+
+  const [unionsRes, pcrRes] = await Promise.all([unionsQuery, pcrQuery]);
 
   return {
     totalUnions: unionsRes.count || 0,
