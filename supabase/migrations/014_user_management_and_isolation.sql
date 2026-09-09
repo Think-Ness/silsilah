@@ -4,20 +4,33 @@
 -- and Data Isolation Cleanup
 -- ============================================================
 
--- 1. Ensure all existing canvases have owner_id assigned to super_admin
+-- 1. Set seluruh kanvas yang sudah ada menjadi milik akun Sigap Dwi Aminullah
 DO $$
 DECLARE
-  v_admin_id UUID;
+  v_sigap_id UUID;
 BEGIN
-  SELECT id INTO v_admin_id FROM profiles WHERE role = 'super_admin' LIMIT 1;
-  IF v_admin_id IS NULL THEN
-    SELECT id INTO v_admin_id FROM auth.users ORDER BY created_at ASC LIMIT 1;
+  -- Cari akun Sigap dari profiles atau auth.users
+  SELECT id INTO v_sigap_id 
+  FROM profiles 
+  WHERE full_name ILIKE '%Sigap%'
+  LIMIT 1;
+
+  IF v_sigap_id IS NULL THEN
+    SELECT id INTO v_sigap_id 
+    FROM auth.users 
+    WHERE email ILIKE '%sigap%' OR raw_user_meta_data->>'full_name' ILIKE '%Sigap%'
+    LIMIT 1;
   END IF;
 
-  IF v_admin_id IS NOT NULL THEN
+  -- Fallback jika belum ditemukan: gunakan super_admin
+  IF v_sigap_id IS NULL THEN
+    SELECT id INTO v_sigap_id FROM profiles WHERE role = 'super_admin' LIMIT 1;
+  END IF;
+
+  -- Update seluruh kanvas yang ada saat ini menjadi milik Sigap
+  IF v_sigap_id IS NOT NULL THEN
     UPDATE canvases 
-    SET owner_id = v_admin_id 
-    WHERE owner_id IS NULL;
+    SET owner_id = v_sigap_id, created_by = v_sigap_id;
   END IF;
 END $$;
 
