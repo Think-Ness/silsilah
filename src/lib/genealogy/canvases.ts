@@ -51,13 +51,17 @@ function saveLocalCanvases(canvases: Canvas[]) {
 export async function getAllCanvases(client?: any): Promise<Canvas[]> {
   const sb = getClient(client);
 
+  let isSuperAdmin = false;
+  let isSigap = false;
+  let currentUserId: string | null = null;
+  let currentUserEmail = "";
+
   try {
     const { data: userData } = await sb.auth.getUser();
-    const currentUserId = userData?.user?.id;
+    currentUserId = userData?.user?.id || null;
+    currentUserEmail = (userData?.user?.email || "").toLowerCase();
 
     // Periksa peran user & apakah akun Sigap
-    let isSuperAdmin = false;
-    let isSigap = false;
     if (currentUserId) {
       const { data: profile } = await sb
         .from("profiles")
@@ -69,8 +73,7 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
         isSuperAdmin = true;
       }
       const fullName = (profile?.full_name || "").toLowerCase();
-      const email = (userData?.user?.email || "").toLowerCase();
-      if (fullName.includes("sigap") || email.includes("sigap")) {
+      if (fullName.includes("sigap") || currentUserEmail.includes("sigap")) {
         isSigap = true;
       }
     }
@@ -99,40 +102,40 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
     }
 
     let dbCanvases: Canvas[] = [];
+    const sharesMap = new Map<string, "edit" | "view">();
+
+    if (currentUserId) {
+      try {
+        const { data: sharesData } = await sb
+          .from("canvas_shares")
+          .select("canvas_id, permission")
+          .eq("user_id", currentUserId);
+
+        if (sharesData) {
+          for (const s of sharesData) {
+            sharesMap.set(s.canvas_id, s.permission as "edit" | "view");
+          }
+        }
+      } catch (e) {}
+
+      const localUserSharesById = getLocalSharesForUser(currentUserId);
+      for (const ls of localUserSharesById) {
+        if (!sharesMap.has(ls.canvas_id)) {
+          sharesMap.set(ls.canvas_id, ls.permission);
+        }
+      }
+    }
+
+    if (currentUserEmail) {
+      const localUserSharesByEmail = getLocalSharesForUser(currentUserEmail);
+      for (const ls of localUserSharesByEmail) {
+        if (!sharesMap.has(ls.canvas_id)) {
+          sharesMap.set(ls.canvas_id, ls.permission);
+        }
+      }
+    }
 
     if (!error && data) {
-      // Ambil shares info untuk user saat ini jika login
-      let sharesMap = new Map<string, "edit" | "view">();
-      if (currentUserId) {
-        try {
-          const { data: sharesData } = await sb
-            .from("canvas_shares")
-            .select("canvas_id, permission")
-            .eq("user_id", currentUserId);
-
-          if (sharesData) {
-            for (const s of sharesData) {
-              sharesMap.set(s.canvas_id, s.permission as "edit" | "view");
-            }
-          }
-        } catch (e) {}
-
-        const localUserSharesById = getLocalSharesForUser(currentUserId);
-        for (const ls of localUserSharesById) {
-          if (!sharesMap.has(ls.canvas_id)) {
-            sharesMap.set(ls.canvas_id, ls.permission);
-          }
-        }
-      }
-      if (email) {
-        const localUserSharesByEmail = getLocalSharesForUser(email);
-        for (const ls of localUserSharesByEmail) {
-          if (!sharesMap.has(ls.canvas_id)) {
-            sharesMap.set(ls.canvas_id, ls.permission);
-          }
-        }
-      }
-
       // Filter hak akses:
       // 1. Super Admin: melihat seluruh kanvas
       // 2. Akun Sigap: melihat seluruh kanvas keluarga miliknya / kanvas legacy

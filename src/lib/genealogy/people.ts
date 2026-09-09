@@ -52,6 +52,7 @@ export async function getAllPeople(
 
   const { data: userData } = await sb.auth.getUser();
   const currentUserId = userData?.user?.id;
+  const currentUserEmail = (userData?.user?.email || "").toLowerCase();
 
   let isSuperAdmin = false;
   let isSigap = false;
@@ -66,8 +67,7 @@ export async function getAllPeople(
       isSuperAdmin = true;
     }
     const fullName = (profile?.full_name || "").toLowerCase();
-    const email = (userData?.user?.email || "").toLowerCase();
-    if (fullName.includes("sigap") || email.includes("sigap")) {
+    if (fullName.includes("sigap") || currentUserEmail.includes("sigap")) {
       isSigap = true;
     }
   }
@@ -94,7 +94,7 @@ export async function getAllPeople(
   // - User dengan kanvas yang dibagikan (shared): melihat data silsilah keluarga kanvas tersebut
   // - User Baru tanpa share: hanya melihat anggota yang dibuat oleh user tersebut (kosong)
   let hasSharedCanvases = false;
-  if (currentUserId || email) {
+  if (currentUserId || currentUserEmail) {
     try {
       const { data: sharesData } = await sb
         .from("canvas_shares")
@@ -111,7 +111,7 @@ export async function getAllPeople(
         const raw = typeof window !== "undefined" ? localStorage.getItem("silsilah_user_shares_map_v1") : null;
         if (raw) {
           const parsed = JSON.parse(raw);
-          if ((email && parsed[email]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
+          if ((currentUserEmail && parsed[currentUserEmail]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
             hasSharedCanvases = true;
           }
         }

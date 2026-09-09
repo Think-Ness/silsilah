@@ -180,6 +180,7 @@ export async function getAllUnions(client?: any): Promise<Union[]> {
 
   const { data: userData } = await sb.auth.getUser();
   const currentUserId = userData?.user?.id;
+  const currentUserEmail = (userData?.user?.email || "").toLowerCase();
 
   let isSuperAdmin = false;
   let isSigap = false;
@@ -194,8 +195,7 @@ export async function getAllUnions(client?: any): Promise<Union[]> {
       isSuperAdmin = true;
     }
     const fullName = (profile?.full_name || "").toLowerCase();
-    const email = (userData?.user?.email || "").toLowerCase();
-    if (fullName.includes("sigap") || email.includes("sigap")) {
+    if (fullName.includes("sigap") || currentUserEmail.includes("sigap")) {
       isSigap = true;
     }
   }
@@ -212,7 +212,7 @@ export async function getAllUnions(client?: any): Promise<Union[]> {
 
   // Isolasi data: jika user memiliki kanvas yang di-share, dapat mengakses unions terkait
   let hasSharedCanvases = false;
-  if (currentUserId || email) {
+  if (currentUserId || currentUserEmail) {
     try {
       const { data: sharesData } = await sb
         .from("canvas_shares")
@@ -227,7 +227,7 @@ export async function getAllUnions(client?: any): Promise<Union[]> {
         const raw = typeof window !== "undefined" ? localStorage.getItem("silsilah_user_shares_map_v1") : null;
         if (raw) {
           const parsed = JSON.parse(raw);
-          if ((email && parsed[email]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
+          if ((currentUserEmail && parsed[currentUserEmail]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
             hasSharedCanvases = true;
           }
         }
@@ -410,6 +410,7 @@ export async function getAllParentChildRelationships(client?: any): Promise<Pare
 
   const { data: userData } = await sb.auth.getUser();
   const currentUserId = userData?.user?.id;
+  const currentUserEmail = (userData?.user?.email || "").toLowerCase();
 
   let isSuperAdmin = false;
   let isSigap = false;
@@ -424,8 +425,7 @@ export async function getAllParentChildRelationships(client?: any): Promise<Pare
       isSuperAdmin = true;
     }
     const fullName = (profile?.full_name || "").toLowerCase();
-    const email = (userData?.user?.email || "").toLowerCase();
-    if (fullName.includes("sigap") || email.includes("sigap")) {
+    if (fullName.includes("sigap") || currentUserEmail.includes("sigap")) {
       isSigap = true;
     }
   }
@@ -442,7 +442,7 @@ export async function getAllParentChildRelationships(client?: any): Promise<Pare
 
   // Isolasi data: jika user biasa (bukan super_admin & bukan sigap), hanya ambil parent-child miliknya kecuali memiliki kanvas yang di-share
   let hasSharedCanvases = false;
-  if (currentUserId || email) {
+  if (currentUserId || currentUserEmail) {
     try {
       const { data: sharesData } = await sb
         .from("canvas_shares")
@@ -457,7 +457,7 @@ export async function getAllParentChildRelationships(client?: any): Promise<Pare
         const raw = typeof window !== "undefined" ? localStorage.getItem("silsilah_user_shares_map_v1") : null;
         if (raw) {
           const parsed = JSON.parse(raw);
-          if ((email && parsed[email]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
+          if ((currentUserEmail && parsed[currentUserEmail]?.length > 0) || (currentUserId && parsed[currentUserId]?.length > 0)) {
             hasSharedCanvases = true;
           }
         }
