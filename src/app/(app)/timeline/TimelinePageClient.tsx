@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { TimelineEvent, TimelineEventType } from "@/lib/genealogy/timeline";
 import { getMediaUrl } from "@/lib/genealogy/media";
+import { useCurrentUser } from "@/context/UserRoleContext";
 import {
   CalendarDays,
   Sparkles,
@@ -13,6 +14,8 @@ import {
   Scissors,
   MapPin,
   User,
+  Users,
+  Share2,
   Filter,
   Search,
   ArrowRight,
@@ -116,6 +119,10 @@ export function TimelinePageClient({
   selectedPersonId,
 }: TimelinePageClientProps) {
   const router = useRouter();
+  const { user, isSuperAdmin } = useCurrentUser();
+  const currentUserId = user?.id;
+
+  const [activeTab, setActiveTab] = useState<"all" | "my" | "shared">("my");
   const [typeFilter, setTypeFilter] = useState<"all" | TimelineEventType>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -136,9 +143,28 @@ export function TimelinePageClient({
         .join(" ")
     : null;
 
+  // Klasifikasi data peristiwa: Milik Saya vs Dibagikan
+  const myEvents = useMemo(() => {
+    if (isSuperAdmin) return events;
+    return events.filter((e) => !e.created_by || e.created_by === currentUserId);
+  }, [events, currentUserId, isSuperAdmin]);
+
+  const sharedEvents = useMemo(() => {
+    if (isSuperAdmin) return [];
+    return events.filter((e) => e.created_by && e.created_by !== currentUserId);
+  }, [events, currentUserId, isSuperAdmin]);
+
+  const hasSharedItems = sharedEvents.length > 0;
+
+  const baseEvents = useMemo(() => {
+    if (activeTab === "my") return myEvents;
+    if (activeTab === "shared") return sharedEvents;
+    return events;
+  }, [events, myEvents, sharedEvents, activeTab]);
+
   // Filter events based on search and type
   const filteredEvents = useMemo(() => {
-    const result = events.filter((evt) => {
+    const result = baseEvents.filter((evt) => {
       if (typeFilter !== "all" && evt.type !== typeFilter) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -162,7 +188,7 @@ export function TimelinePageClient({
         return timeB - timeA;
       }
     });
-  }, [events, typeFilter, searchQuery, sortOrder]);
+  }, [baseEvents, typeFilter, searchQuery, sortOrder]);
 
   // Regroup filtered events by decade
   const filteredDecadesArr = useMemo(() => {
@@ -178,12 +204,12 @@ export function TimelinePageClient({
   }, [filteredEvents, sortOrder]);
 
   // Overall counts
-  const birthCount = events.filter((e) => e.type === "birth").length;
-  const marriageCount = events.filter((e) => e.type === "marriage").length;
-  const deathCount = events.filter((e) => e.type === "death").length;
+  const birthCount = baseEvents.filter((e) => e.type === "birth").length;
+  const marriageCount = baseEvents.filter((e) => e.type === "marriage").length;
+  const deathCount = baseEvents.filter((e) => e.type === "death").length;
 
-  const minYear = events.length > 0 ? Math.min(...events.map((e) => e.year).filter(Boolean)) : 0;
-  const maxYear = events.length > 0 ? Math.max(...events.map((e) => e.year).filter(Boolean)) : 0;
+  const minYear = baseEvents.length > 0 ? Math.min(...baseEvents.map((e) => e.year).filter(Boolean)) : 0;
+  const maxYear = baseEvents.length > 0 ? Math.max(...baseEvents.map((e) => e.year).filter(Boolean)) : 0;
   const yearSpan = maxYear && minYear ? maxYear - minYear : 0;
 
   const scrollToDecade = (decade: number) => {
@@ -204,7 +230,7 @@ export function TimelinePageClient({
           alignItems: "flex-start",
           flexWrap: "wrap",
           gap: 16,
-          marginBottom: 20,
+          marginBottom: 16,
         }}
       >
         <div>
@@ -239,6 +265,77 @@ export function TimelinePageClient({
             Tambah Hubungan / Pernikahan
           </Link>
         </div>
+      </div>
+
+      {/* Ownership Filter Tabs: Data Saya (Default), Semua, Dibagikan */}
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 w-fit mb-4">
+        <button
+          type="button"
+          onClick={() => setActiveTab("my")}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            activeTab === "my"
+              ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>Data Saya</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "my"
+                ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold"
+                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            {myEvents.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("all")}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            activeTab === "all"
+              ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Semua</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "all"
+                ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold"
+                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            {events.length}
+          </span>
+        </button>
+
+        {hasSharedItems && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("shared")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === "shared"
+                ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Dibagikan</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeTab === "shared"
+                  ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold"
+                  : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+              }`}
+            >
+              {sharedEvents.length}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Stats Summary Cards */}
@@ -793,24 +890,37 @@ export function TimelinePageClient({
                           </div>
                         </div>
 
-                        {/* Category Badge */}
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: config.color,
-                            background: config.badgeBg,
-                            padding: "3px 9px",
-                            borderRadius: "var(--radius-sm)",
-                            border: `1px solid ${config.border}`,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <Icon className="w-3 h-3" />
-                          {config.label}
-                        </span>
+                        {/* Badges Container */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {event.created_by && event.created_by !== currentUserId && !isSuperAdmin ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                              <Share2 className="w-2.5 h-2.5" /> Dibagikan
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              Data Saya
+                            </span>
+                          )}
+
+                          {/* Category Badge */}
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: config.color,
+                              background: config.badgeBg,
+                              padding: "3px 9px",
+                              borderRadius: "var(--radius-sm)",
+                              border: `1px solid ${config.border}`,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <Icon className="w-3 h-3" />
+                            {config.label}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Story Footer Meta */}
@@ -1092,23 +1202,35 @@ export function TimelinePageClient({
                               {event.description}
                             </h4>
 
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: config.color,
-                                background: config.badgeBg,
-                                padding: "2px 8px",
-                                borderRadius: "var(--radius-sm)",
-                                border: `1px solid ${config.border}`,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                              }}
-                            >
-                              <Icon className="w-3 h-3" />
-                              {config.label}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              {event.created_by && event.created_by !== currentUserId && !isSuperAdmin ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                  <Share2 className="w-2.5 h-2.5" /> Dibagikan
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                  Data Saya
+                                </span>
+                              )}
+
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: config.color,
+                                  background: config.badgeBg,
+                                  padding: "2px 8px",
+                                  borderRadius: "var(--radius-sm)",
+                                  border: `1px solid ${config.border}`,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <Icon className="w-3 h-3" />
+                                {config.label}
+                              </span>
+                            </div>
                           </div>
 
                           <div

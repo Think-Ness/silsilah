@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Network, Plus, Loader2, X, Search, User, Sparkles } from "lucide-react";
 import { createCanvas } from "@/lib/genealogy/canvases";
+import { useCurrentUser } from "@/context/UserRoleContext";
 import type { Canvas, PersonWithPortrait } from "@/types/genealogy";
 
 export interface CreateCanvasModalProps {
@@ -21,22 +22,36 @@ export function CreateCanvasModal({
   onClose,
   onSuccess,
 }: CreateCanvasModalProps) {
+  const { user, isSuperAdmin } = useCurrentUser();
+  const currentUserId = user?.id;
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedRootPersonId, setSelectedRootPersonId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Hanya anggota milik user sendiri yang bisa dijadikan titik pusat silsilah baru
+  const ownPeople = useMemo(() => {
+    if (isSuperAdmin) return people;
+    if (!currentUserId) return [];
+    return people.filter((p) => p.created_by === currentUserId);
+  }, [people, currentUserId, isSuperAdmin]);
+
   // Set initial state saat modal terbuka
   useEffect(() => {
     if (!open) return;
 
     if (initialRootPersonId) {
-      setSelectedRootPersonId(initialRootPersonId);
-      const rootPerson = people.find((p) => p.id === initialRootPersonId);
+      const rootPerson = ownPeople.find((p) => p.id === initialRootPersonId);
       if (rootPerson) {
+        setSelectedRootPersonId(initialRootPersonId);
         setTitle(`Silsilah Keluarga ${rootPerson.full_name}`);
         setDescription(`Pohon silsilah yang berpusat pada ${rootPerson.full_name} beserta leluhur dan seluruh keturunan.`);
+      } else {
+        setSelectedRootPersonId("");
+        setTitle("");
+        setDescription("");
       }
     } else {
       setTitle("");
@@ -44,7 +59,7 @@ export function CreateCanvasModal({
       setSelectedRootPersonId("");
     }
     setSearchTerm("");
-  }, [open, initialRootPersonId, people]);
+  }, [open, initialRootPersonId, ownPeople]);
 
   // Handle saat memilih tokoh utama
   const handleSelectRootPerson = (person: PersonWithPortrait) => {
@@ -58,9 +73,9 @@ export function CreateCanvasModal({
   };
 
   const filteredPeople = useMemo(() => {
-    if (!searchTerm.trim()) return people.slice(0, 10);
+    if (!searchTerm.trim()) return ownPeople.slice(0, 10);
     const lower = searchTerm.toLowerCase();
-    return people
+    return ownPeople
       .filter(
         (p) =>
           p.full_name.toLowerCase().includes(lower) ||
@@ -68,9 +83,9 @@ export function CreateCanvasModal({
           (p.nickname && p.nickname.toLowerCase().includes(lower))
       )
       .slice(0, 15);
-  }, [people, searchTerm]);
+  }, [ownPeople, searchTerm]);
 
-  const selectedPerson = people.find((p) => p.id === selectedRootPersonId);
+  const selectedPerson = ownPeople.find((p) => p.id === selectedRootPersonId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,7 +222,9 @@ export function CreateCanvasModal({
                     ))
                   ) : (
                     <div className="p-4 text-center text-xs text-slate-400">
-                      Anggota tidak ditemukan
+                      {ownPeople.length === 0
+                        ? "Belum ada anggota keluarga milik Anda. Anda tetap dapat membuat kanvas kosong."
+                        : "Anggota tidak ditemukan"}
                     </div>
                   )}
                 </div>

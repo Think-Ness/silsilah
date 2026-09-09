@@ -30,6 +30,7 @@ export interface TimelineEvent {
   relatedPersonPortraitPath?: string | null;
   place?: string;
   ageAtEvent?: number | null;     // e.g. age at marriage, age at death
+  created_by?: string | null;
 }
 
 const MONTH_ID = [
@@ -79,31 +80,9 @@ function personDisplayName(p: { prefix_title?: string | null; display_name?: str
 export async function getTimelineEvents(personId?: string): Promise<TimelineEvent[]> {
   const supabase = await createClient();
 
-  const { data: userData } = await supabase.auth.getUser();
-  const currentUserId = userData?.user?.id;
-
-  let isSuperAdmin = false;
-  let isSigap = false;
-  if (currentUserId) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", currentUserId)
-      .maybeSingle();
-
-    if (profile?.role === "super_admin") {
-      isSuperAdmin = true;
-    }
-    const fullName = (profile?.full_name || "").toLowerCase();
-    const email = (userData?.user?.email || "").toLowerCase();
-    if (fullName.includes("sigap") || email.includes("sigap")) {
-      isSigap = true;
-    }
-  }
-
   const events: TimelineEvent[] = [];
 
-  // Fetch people with their portrait media, filtered by user ownership
+  // Fetch people with their portrait media
   let peopleQuery = supabase
     .from("people")
     .select("*, portrait:media!portrait_media_id(storage_path)")
@@ -111,8 +90,6 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
 
   if (personId) {
     peopleQuery = peopleQuery.eq("id", personId);
-  } else if (!isSuperAdmin && !isSigap && currentUserId) {
-    peopleQuery = peopleQuery.eq("created_by", currentUserId);
   }
 
   const { data: people } = await peopleQuery;
@@ -138,6 +115,7 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
         description: `Kelahiran ${name}`,
         place: person.birth_place ?? undefined,
         ageAtEvent: null,
+        created_by: person.created_by || null,
       });
     }
 
@@ -158,6 +136,7 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
         description: `${name} wafat`,
         place: person.death_place ?? undefined,
         ageAtEvent: ageAtDeath,
+        created_by: person.created_by || null,
       });
     }
   }
@@ -167,10 +146,6 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
     .from("unions")
     .select("*")
     .or("start_date.not.is.null,end_date.not.is.null");
-
-  if (!isSuperAdmin && !isSigap && currentUserId) {
-    unionsQuery = unionsQuery.eq("created_by", currentUserId);
-  }
 
   const { data: unions } = await unionsQuery.returns<Union[]>();
 
@@ -182,12 +157,8 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
 
   let allPeopleQuery = supabase
     .from("people")
-    .select("id, full_name, display_name, prefix_title, suffix_title, gender, birth_date, portrait:media!portrait_media_id(storage_path)")
+    .select("id, full_name, display_name, prefix_title, suffix_title, gender, birth_date, created_by, portrait:media!portrait_media_id(storage_path)")
     .is("archived_at", null);
-
-  if (!isSuperAdmin && !isSigap && currentUserId) {
-    allPeopleQuery = allPeopleQuery.eq("created_by", currentUserId);
-  }
 
   const { data: allPeople } = await allPeopleQuery;
 
@@ -231,6 +202,7 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
         relatedPersonPortraitPath: p2Portrait,
         description: `Pernikahan ${p1Name} & ${p2Name}`,
         ageAtEvent: ageP1,
+        created_by: union.created_by || p1.created_by || null,
       });
     }
 
@@ -255,6 +227,7 @@ export async function getTimelineEvents(personId?: string): Promise<TimelineEven
         description: isDivorce
           ? `Perceraian ${p1Name} & ${p2Name}`
           : `Pernikahan ${p1Name} & ${p2Name} berakhir`,
+        created_by: union.created_by || p1.created_by || null,
       });
     }
   }

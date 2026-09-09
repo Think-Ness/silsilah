@@ -52,6 +52,34 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
     notFound();
   }
 
+  const { data: userData } = await supabase.auth.getUser();
+  const currentUserId = userData?.user?.id;
+
+  let isSuperAdmin = false;
+  if (currentUserId) {
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", currentUserId)
+      .maybeSingle();
+    isSuperAdmin = userProfile?.role === "super_admin";
+  }
+
+  const isOwner = !profile.created_by || profile.created_by === currentUserId;
+  let canEdit = isSuperAdmin || isOwner;
+  if (!canEdit && currentUserId) {
+    const { data: editShares } = await supabase
+      .from("canvas_shares")
+      .select("permission")
+      .eq("user_id", currentUserId)
+      .eq("permission", "edit");
+    if (editShares && editShares.length > 0) {
+      canEdit = true;
+    }
+  }
+
+  const canDelete = isSuperAdmin || isOwner;
+
   const displayName = getDisplayName(profile);
   const portraitUrl = profile.portrait ? getMediaUrl(profile.portrait.storage_path) : null;
 
@@ -149,32 +177,38 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
           )}
 
           {/* Action buttons */}
-          <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-            <Link
-              href={`/people/${id}/edit`}
-              id="edit-person-button"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "7px 14px",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "var(--foreground)",
-                textDecoration: "none",
-              }}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit Profil
-            </Link>
+          {(canEdit || canDelete) && (
+            <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              {canEdit && (
+                <Link
+                  href={`/people/${id}/edit`}
+                  id="edit-person-button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "7px 14px",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-md)",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--foreground)",
+                    textDecoration: "none",
+                  }}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit Profil
+                </Link>
+              )}
 
-            <DeletePersonButton
-              personId={cleanId}
-              personName={displayName}
-            />
-          </div>
+              {canDelete && (
+                <DeletePersonButton
+                  personId={cleanId}
+                  personName={displayName}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 

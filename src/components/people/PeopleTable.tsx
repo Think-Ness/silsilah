@@ -59,7 +59,7 @@ export function PeopleTable({ people }: PeopleTableProps) {
   const { user, isSuperAdmin, isViewer, canEdit, canDelete } = useCurrentUser();
   const currentUserId = user?.id;
 
-  const [activeTab, setActiveTab] = useState<"all" | "my" | "shared">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "my" | "shared">("my");
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 

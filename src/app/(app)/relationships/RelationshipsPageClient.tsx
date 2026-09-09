@@ -27,7 +27,7 @@ export function RelationshipsPageClient({
   const { user, isSuperAdmin, canEdit } = useCurrentUser();
   const currentUserId = user?.id;
 
-  const [activeTab, setActiveTab] = useState<"all" | "my" | "shared">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "my" | "shared">("my");
   const [searchTerm, setSearchTerm] = useState("");
 
   const peopleMap = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
