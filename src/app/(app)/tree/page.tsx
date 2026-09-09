@@ -63,7 +63,7 @@ export default function FamilyTreePage() {
     open: false,
     initialRootPersonId: null,
   });
-  const [familyTitle, setFamilyTitle] = useState("Silsilah Zuriat Ahlan & Hj. Siti Maskah");
+  const [familyTitle, setFamilyTitle] = useState("Pohon Silsilah Keluarga");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(familyTitle);
 

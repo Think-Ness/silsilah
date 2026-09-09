@@ -122,11 +122,6 @@ export function CanvasSelector({
                         <p className="text-xs font-semibold truncate">
                           {canvas.title}
                         </p>
-                        {canvas.is_default && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 shrink-0">
-                            Utama
-                          </span>
-                        )}
                       </div>
                       {canvas.root_person ? (
                         <p className="text-[11px] text-slate-400 truncate">
@@ -146,7 +141,7 @@ export function CanvasSelector({
                     {isSelected && (
                       <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     )}
-                    {!canvas.is_default && onDeleteCanvas && (
+                    {onDeleteCanvas && (
                       <button
                         type="button"
                         onClick={(e) => {

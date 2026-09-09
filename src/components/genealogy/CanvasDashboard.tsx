@@ -40,24 +40,16 @@ export function CanvasDashboard({
   onDeleteCanvas,
 }: CanvasDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "default" | "custom">("all");
 
   const filteredCanvases = useMemo(() => {
     return canvases.filter((c) => {
-      // Filter search
       const matchesSearch =
         c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.description && c.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (c.root_person && c.root_person.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      // Filter type
-      if (filterType === "default") return matchesSearch && c.is_default;
-      if (filterType === "custom") return matchesSearch && !c.is_default;
       return matchesSearch;
     });
-  }, [canvases, searchTerm, filterType]);
-
-  const defaultCanvas = canvases.find((c) => c.is_default) || canvases[0];
+  }, [canvases, searchTerm]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 p-6 md:p-8">
@@ -68,13 +60,13 @@ export function CanvasDashboard({
             <div className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-emerald-100">
                 <Layers className="w-3.5 h-3.5" />
-                <span>Multi-POV Family Trees</span>
+                <span>Multi-Family Genealogy Canvases</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
                 Dashboard Kanvas Silsilah
               </h1>
               <p className="text-sm text-emerald-100/90 leading-relaxed">
-                Kelola berbagai kanvas silsilah keluarga dalam satu tempat. Buka silsilah utama atau buat kanvas khusus dari sudut pandang (POV) cabang keluarga tertentu.
+                Kelola berbagai kanvas silsilah keluarga dalam satu tempat. Buka kanvas keluarga yang sudah ada atau buat kanvas baru untuk berbagai cabang dan silsilah keluarga.
               </p>
             </div>
 
@@ -95,47 +87,16 @@ export function CanvasDashboard({
           <div className="absolute right-1/3 -top-16 w-48 h-48 rounded-full bg-teal-300/10 blur-2xl pointer-events-none" />
         </div>
 
-        {/* Stats & Search/Filter Controls */}
+        {/* Stats & Search Input */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2 p-1 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm w-fit">
-            <button
-              type="button"
-              onClick={() => setFilterType("all")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                filterType === "all"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              Semua Kanvas ({canvases.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType("default")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                filterType === "default"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              Utama
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType("custom")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                filterType === "custom"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              Cabang Khusus ({canvases.filter((c) => !c.is_default).length})
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Daftar Kanvas ({canvases.length})
+            </span>
           </div>
 
           {/* Search Input */}
-          <div className="relative min-w-[260px] sm:w-72">
+          <div className="relative min-w-[260px] sm:w-80">
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -150,7 +111,6 @@ export function CanvasDashboard({
         {/* Canvas Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCanvases.map((canvas) => {
-            const isDefault = canvas.is_default;
             const rootPerson = canvas.root_person;
             const isCurrentlyActive = canvas.id === activeCanvasId;
 
@@ -158,41 +118,27 @@ export function CanvasDashboard({
               <div
                 key={canvas.id}
                 className={`group relative flex flex-col justify-between rounded-3xl p-6 bg-white dark:bg-slate-900 border transition-all duration-200 hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-slate-950/50 hover:-translate-y-0.5 ${
-                  isDefault
-                    ? "border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-b from-emerald-50/20 to-white dark:to-slate-900"
-                    : isCurrentlyActive
-                    ? "border-emerald-500 ring-2 ring-emerald-500/20"
+                  isCurrentlyActive
+                    ? "border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg"
                     : "border-slate-200/80 dark:border-slate-800"
                 }`}
               >
                 <div className="space-y-4">
-                  {/* Top Bar: Icon, Badge, & Delete */}
+                  {/* Top Bar: Icon & Delete */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div
-                        className={`h-11 w-11 rounded-2xl flex items-center justify-center font-bold text-base shadow-sm ${
-                          isDefault
-                            ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-500/20"
-                            : "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20"
-                        }`}
-                      >
-                        {isDefault ? <Crown className="w-5 h-5" /> : <GitBranch className="w-5 h-5" />}
+                      <div className="h-11 w-11 rounded-2xl flex items-center justify-center font-bold text-base shadow-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20">
+                        <Layers className="w-5 h-5" />
                       </div>
 
                       <div>
-                        {isDefault ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/60">
-                            <Crown className="w-3 h-3" /> Kanvas Utama
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
-                            Cabang POV
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+                          Kanvas Silsilah
+                        </span>
                       </div>
                     </div>
 
-                    {!isDefault && onDeleteCanvas && (
+                    {onDeleteCanvas && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -238,7 +184,7 @@ export function CanvasDashboard({
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Tokoh Pusat (POV)
+                          Tokoh Pusat Silsilah
                         </p>
                         <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                           {rootPerson.full_name}
@@ -252,10 +198,10 @@ export function CanvasDashboard({
                       </div>
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Cakupan
+                          Cakupan Silsilah
                         </p>
                         <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                          Seluruh Keluarga Besar
+                          Seluruh Anggota Keluarga
                         </p>
                       </div>
                     </div>
@@ -301,7 +247,7 @@ export function CanvasDashboard({
                 + Buat Kanvas Silsilah Baru
               </p>
               <p className="text-xs text-slate-400 max-w-[200px]">
-                Buat cabang silsilah keluarga baru dari tokoh anggota mana pun
+                Buat kanvas silsilah keluarga baru dari tokoh anggota mana pun
               </p>
             </div>
           </button>

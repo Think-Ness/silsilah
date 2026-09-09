@@ -89,7 +89,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@keluarga.id"
+                  placeholder="nama@email.com"
                   autoComplete="email"
                   required
                   style={{ marginTop: "6px" }}
@@ -126,7 +126,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: "center", fontSize: "12px", color: "var(--muted)", marginTop: "16px" }}>
-          Akses terbatas untuk anggota keluarga yang berwenang.
+          Masuk untuk mengelola silsilah dan arsip keluarga.
         </p>
       </div>
     </div>

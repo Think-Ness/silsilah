@@ -353,19 +353,17 @@ export const PersonNode = memo(function PersonNode({
           </button>
         )}
 
-        {/* Tombol Keluarkan dari Kanvas (Khusus kanvas cabang/kustom) */}
-        {!isDefaultCanvas && (
-          <button
-            type="button"
-            onClick={handleRemoveFromCanvas}
-            title="Keluarkan anggota ini dari kanvas (data di database tidak terhapus)"
-            aria-label="Keluarkan dari Kanvas"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-600"
-          >
-            <MinusCircle className="w-3 h-3 text-slate-400" />
-            <span>Lepas</span>
-          </button>
-        )}
+        {/* Tombol Keluarkan dari Kanvas */}
+        <button
+          type="button"
+          onClick={handleRemoveFromCanvas}
+          title="Keluarkan anggota ini dari kanvas (data di database tidak terhapus)"
+          aria-label="Keluarkan dari Kanvas"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-600"
+        >
+          <MinusCircle className="w-3 h-3 text-slate-400" />
+          <span>Lepas</span>
+        </button>
 
         {isSuperAdmin && (
           <button

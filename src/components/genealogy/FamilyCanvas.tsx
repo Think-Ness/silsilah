@@ -64,7 +64,7 @@ function CanvasInner({
   parentChildRels,
   onPersonClick,
   selectedPersonId,
-  customTitle = "Silsilah Zuriat Ahlan & Hj. Siti Maskah",
+  customTitle = "Pohon Silsilah Keluarga",
   onTitleChange,
 }: FamilyCanvasProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -596,19 +596,17 @@ function CanvasInner({
 
   return (
     <div className="genealogy-canvas" style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Top Floating Action: Impor Anggota dari Database (Khusus Kanvas Cabang) */}
-      {!isDefaultCanvas && (
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-lg shadow-black/5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-800 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs font-bold transition-all hover:scale-105"
-          >
-            <Users className="w-3.5 h-3.5 text-emerald-600" />
-            <span>+ Impor Anggota dari Database ({includedPersonIds?.length || 1} di kanvas)</span>
-          </button>
-        </div>
-      )}
+      {/* Top Floating Action: Impor Anggota dari Database */}
+      <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setIsImportModalOpen(true)}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-lg shadow-black/5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-800 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs font-bold transition-all hover:scale-105"
+        >
+          <Users className="w-3.5 h-3.5 text-emerald-600" />
+          <span>+ Impor Anggota dari Database ({includedPersonIds?.length || people.length} di kanvas)</span>
+        </button>
+      </div>
 
       <ReactFlow
         nodes={nodes}

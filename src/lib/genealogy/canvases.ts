@@ -55,7 +55,6 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
           portrait:media!people_portrait_media_fk(id, storage_path, storage_bucket)
         )
       `)
-      .order("is_default", { ascending: false })
       .order("created_at", { ascending: true });
 
     if (!error && data && data.length > 0) {
@@ -73,13 +72,13 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
     return localList;
   }
 
-  // Initial default canvas fallback
+  // Initial canvas fallback
   const defaultCanvas: Canvas = {
     id: "default-canvas",
-    title: "Silsilah Zuriat Ahlan & Hj. Siti Maskah",
-    description: "Pohon silsilah zuriat keluarga besar Ahlan & Hj. Siti Maskah beserta seluruh keturunan.",
+    title: "Pohon Silsilah Keluarga",
+    description: "Pohon silsilah dan dokumentasi garis keturunan keluarga besar.",
     root_person_id: null,
-    is_default: true,
+    is_default: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -325,19 +324,19 @@ export async function saveCanvasPositions(
   }
 }
 
-/** Hapus kanvas (kecuali kanvas default) */
+/** Hapus kanvas */
 export async function deleteCanvas(id: string, client?: any): Promise<boolean> {
   const sb = getClient(client);
 
   try {
-    const { error } = await sb.from("canvases").delete().eq("id", id).eq("is_default", false);
+    const { error } = await sb.from("canvases").delete().eq("id", id);
     if (error) throw error;
   } catch (err) {
     console.warn("Supabase delete canvas failed:", err);
   }
 
   const localList = getLocalCanvases();
-  const updatedList = localList.filter((c) => c.id !== id || c.is_default);
+  const updatedList = localList.filter((c) => c.id !== id);
   saveLocalCanvases(updatedList);
 
   if (typeof window !== "undefined") {
