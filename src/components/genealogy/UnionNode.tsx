@@ -67,13 +67,15 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
     ? "text-zinc-600"
     : "text-rose-600";
 
+  const canEdit = (data as any)?.canEdit !== false;
+
   const tooltipText = `Hubungan: ${info.statusLabel}${
     data.union?.start_date ? ` · Sejak ${data.union.start_date}` : ""
-  }\n${info.doaText}\n(Klik untuk edit detail · Geser untuk memindahkan)`;
+  }\n${info.doaText}\n${canEdit ? "(Klik untuk edit detail · Geser untuk memindahkan)" : "(Mode Hanya Baca)"}`;
 
   return (
     <div
-      onMouseDown={handleMouseDown}
+      onMouseDown={canEdit ? handleMouseDown : undefined}
       onClick={handleClick}
       style={{
         width: 32,
@@ -91,11 +93,11 @@ export const UnionNode = memo(function UnionNode({ data }: UnionNodeProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: "grab",
+        cursor: canEdit ? "grab" : "default",
         position: "relative",
         transition: "transform 150ms ease, box-shadow 150ms ease",
       }}
-      className="hover:scale-125 hover:shadow-lg group active:cursor-grabbing"
+      className={canEdit ? "hover:scale-125 hover:shadow-lg group active:cursor-grabbing" : "group"}
       title={tooltipText}
     >
       {/* Handle ke Leluhur / Atas */}

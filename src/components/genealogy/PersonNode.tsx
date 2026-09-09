@@ -339,8 +339,8 @@ export const PersonNode = memo(function PersonNode({
 
   return (
     <div
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseEnter={nodeCanEdit ? handleMouseEnter : undefined}
+      onMouseLeave={nodeCanEdit ? handleMouseLeave : undefined}
       className={`person-node group ${isDeceased ? "deceased" : ""} ${selected ? "selected" : ""}`}
       style={{
         width: 240,
@@ -367,7 +367,7 @@ export const PersonNode = memo(function PersonNode({
       aria-label={`${displayName}`}
     >
       {/* Ghost Preview Containers */}
-      {hoveredSnapshot === "parents" && availableSnapshots?.parents && availableSnapshots.parents.length > 0 && (
+      {nodeCanEdit && hoveredSnapshot === "parents" && availableSnapshots?.parents && availableSnapshots.parents.length > 0 && (
         <div className="absolute bottom-[calc(100%+48px)] left-1/2 -translate-x-1/2 flex items-center gap-2.5 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
           {availableSnapshots.parents.map((p) => (
             <GhostCard
@@ -380,7 +380,7 @@ export const PersonNode = memo(function PersonNode({
         </div>
       )}
 
-      {hoveredSnapshot === "siblings" && availableSnapshots?.siblings && availableSnapshots.siblings.length > 0 && (
+      {nodeCanEdit && hoveredSnapshot === "siblings" && availableSnapshots?.siblings && availableSnapshots.siblings.length > 0 && (
         <div className="absolute bottom-[calc(100%+48px)] left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
           {availableSnapshots.siblings.slice(0, 2).map((p) => (
             <GhostCard
@@ -398,7 +398,7 @@ export const PersonNode = memo(function PersonNode({
         </div>
       )}
 
-      {hoveredSnapshot === "spouses" && availableSnapshots?.spouses && availableSnapshots.spouses.length > 0 && (
+      {nodeCanEdit && hoveredSnapshot === "spouses" && availableSnapshots?.spouses && availableSnapshots.spouses.length > 0 && (
         <div className="absolute left-[calc(100%+165px)] top-1/2 -translate-y-1/2 flex flex-col gap-2 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
           {availableSnapshots.spouses.map((p) => (
             <GhostCard
@@ -411,7 +411,7 @@ export const PersonNode = memo(function PersonNode({
         </div>
       )}
 
-      {hoveredSnapshot === "children" && availableSnapshots?.children && availableSnapshots.children.length > 0 && (
+      {nodeCanEdit && hoveredSnapshot === "children" && availableSnapshots?.children && availableSnapshots.children.length > 0 && (
         <div className="absolute top-[calc(100%+48px)] left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none z-[70] animate-in fade-in zoom-in-95 duration-150">
           {availableSnapshots.children.slice(0, 2).map((p) => (
             <GhostCard
@@ -430,13 +430,12 @@ export const PersonNode = memo(function PersonNode({
       )}
 
       {/* Floating Action Buttons: Top (Ayah / Ibu / Snapshot Orang Tua & Saudara) */}
-      <div
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={`action-toolbar absolute bottom-full pb-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 transition-all duration-150 z-30 whitespace-nowrap ${
-          showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-      >
+      {showActions && (
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className="action-toolbar absolute bottom-full pb-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 transition-all duration-150 z-30 whitespace-nowrap opacity-100 pointer-events-auto"
+        >
         {/* Snapshot Orang Tua (Jika sudah ada di DB tapi belum ada di kanvas) */}
         {availableSnapshots?.parents && availableSnapshots.parents.length > 0 ? (
           <button
@@ -464,9 +463,9 @@ export const PersonNode = memo(function PersonNode({
                 onClick={(e) => handleQuickAdd(e, "add_father")}
                 title="Tambah Ayah Baru"
                 aria-label="Tambah Ayah"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-blue-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-900/95 hover:bg-blue-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-blue-600/60"
               >
-                <UserPlus className="w-3 h-3 text-blue-300" />
+                <Plus className="w-3 h-3 text-blue-200" />
                 <span>Ayah</span>
               </button>
             )}
@@ -476,9 +475,9 @@ export const PersonNode = memo(function PersonNode({
                 onClick={(e) => handleQuickAdd(e, "add_mother")}
                 title="Tambah Ibu Baru"
                 aria-label="Tambah Ibu"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-rose-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-900/95 hover:bg-rose-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-rose-600/60"
               >
-                <UserPlus className="w-3 h-3 text-rose-300" />
+                <Plus className="w-3 h-3 text-rose-200" />
                 <span>Ibu</span>
               </button>
             )}
@@ -530,15 +529,14 @@ export const PersonNode = memo(function PersonNode({
           </button>
         )}
       </div>
+      )}
 
       {/* Floating Action Button: Side (+ Pasangan / Snapshot Pasangan) */}
-      {(canAddSpouse || (availableSnapshots?.spouses && availableSnapshots.spouses.length > 0)) && (
+      {showActions && (canAddSpouse || (availableSnapshots?.spouses && availableSnapshots.spouses.length > 0)) && (
         <div
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          className={`action-toolbar absolute left-full pl-3.5 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-all duration-150 z-30 whitespace-nowrap ${
-            showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
+          className="action-toolbar absolute left-full pl-3.5 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-all duration-150 z-30 whitespace-nowrap opacity-100 pointer-events-auto"
         >
           {availableSnapshots?.spouses && availableSnapshots.spouses.length > 0 ? (
             <button
@@ -574,81 +572,81 @@ export const PersonNode = memo(function PersonNode({
       )}
 
       {/* Floating Action Button: Bottom (+ Anak / Snapshot Anak & Atur Urutan) */}
-      <div
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={`action-toolbar absolute top-full pt-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 transition-all duration-150 z-30 whitespace-nowrap ${
-          showActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        {/* Snapshot Anak (Jika ada di DB tapi belum ada di kanvas) */}
-        {availableSnapshots?.children && availableSnapshots.children.length > 0 ? (
-          <button
-            type="button"
-            onMouseEnter={() => setHoveredSnapshot("children")}
-            onMouseLeave={() => setHoveredSnapshot(null)}
-            onClick={(e) => {
-              setHoveredSnapshot(null);
-              handleImportSnapshot(
-                e,
-                availableSnapshots.children.map((p) => p.id)
-              );
-            }}
-            title={`Masukkan ${availableSnapshots.children.length} Anak dari database ke kanvas ini`}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 cursor-pointer border border-emerald-400"
-          >
-            <Download className="w-3 h-3 text-emerald-100" />
-            <span>+ Masukkan Anak ({availableSnapshots.children.length})</span>
-          </button>
-        ) : spouses && spouses.length > 0 ? (
-          <button
-            type="button"
-            onClick={(e) => handleQuickAdd(e, "add_child")}
-            title="Tambah Anak Baru"
-            aria-label="Tambah Anak"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/95 hover:bg-emerald-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-emerald-600/60"
-          >
-            <Plus className="w-3 h-3 text-emerald-200" />
-            <span>Anak</span>
-          </button>
-        ) : null}
+      {showActions && (
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className="action-toolbar absolute top-full pt-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 transition-all duration-150 z-30 whitespace-nowrap opacity-100 pointer-events-auto"
+        >
+          {/* Snapshot Anak (Jika ada di DB tapi belum ada di kanvas) */}
+          {availableSnapshots?.children && availableSnapshots.children.length > 0 ? (
+            <button
+              type="button"
+              onMouseEnter={() => setHoveredSnapshot("children")}
+              onMouseLeave={() => setHoveredSnapshot(null)}
+              onClick={(e) => {
+                setHoveredSnapshot(null);
+                handleImportSnapshot(
+                  e,
+                  availableSnapshots.children.map((p) => p.id)
+                );
+              }}
+              title={`Masukkan ${availableSnapshots.children.length} Anak dari database ke kanvas ini`}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 cursor-pointer border border-emerald-400"
+            >
+              <Download className="w-3 h-3 text-emerald-100" />
+              <span>+ Masukkan Anak ({availableSnapshots.children.length})</span>
+            </button>
+          ) : spouses && spouses.length > 0 ? (
+            <button
+              type="button"
+              onClick={(e) => handleQuickAdd(e, "add_child")}
+              title="Tambah Anak Baru"
+              aria-label="Tambah Anak"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/95 hover:bg-emerald-600 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-emerald-600/60"
+            >
+              <Plus className="w-3 h-3 text-emerald-200" />
+              <span>Anak</span>
+            </button>
+          ) : null}
 
-        {data.childrenCount != null && data.childrenCount > 1 && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.dispatchEvent(
-                new CustomEvent("silsilah:reorder-children", {
-                  detail: {
-                    parentId: person.id,
-                    parentName: displayName,
-                  },
-                })
-              );
-            }}
-            title="Atur Urutan Kelahiran Anak (Drag & Drop)"
-            aria-label="Atur Urutan Anak"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-emerald-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
-          >
-            <ArrowUpDown className="w-3 h-3 text-emerald-300" />
-            <span>Urutan</span>
-          </button>
-        )}
+          {data.childrenCount != null && data.childrenCount > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.dispatchEvent(
+                  new CustomEvent("silsilah:reorder-children", {
+                    detail: {
+                      parentId: person.id,
+                      parentName: displayName,
+                    },
+                  })
+                );
+              }}
+              title="Atur Urutan Kelahiran Anak (Drag & Drop)"
+              aria-label="Atur Urutan Anak"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 hover:bg-emerald-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-slate-700/60"
+            >
+              <ArrowUpDown className="w-3 h-3 text-emerald-300" />
+              <span>Urutan</span>
+            </button>
+          )}
 
-        {(isSuperAdmin || (Boolean(currentUserId) && person.created_by === currentUserId)) && (
-          <button
-            type="button"
-            onClick={handleOpenCreateCanvas}
-            title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
-            aria-label="Buat Kanvas Silsilah"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
-          >
-            <Layers className="w-3 h-3 text-cyan-300" />
-            <span>+ Kanvas</span>
-          </button>
-        )}
-      </div>
+          {(isSuperAdmin || (Boolean(currentUserId) && person.created_by === currentUserId)) && (
+            <button
+              type="button"
+              onClick={handleOpenCreateCanvas}
+              title={`Buat Kanvas Silsilah Cabang Keluarga ${displayName}`}
+              aria-label="Buat Kanvas Silsilah"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-900/95 hover:bg-cyan-700 text-white text-[11px] font-medium backdrop-blur shadow-md transition-all hover:scale-105 cursor-pointer border border-cyan-600/60"
+            >
+              <Layers className="w-3 h-3 text-cyan-300" />
+              <span>+ Kanvas</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Connection handles */}
       <Handle
