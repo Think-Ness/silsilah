@@ -157,56 +157,91 @@ export async function getAllCanvases(client?: any): Promise<Canvas[]> {
       });
     }
 
-    // Merge dengan kanvas lokal (fallback jika offline / terjadi isu RLS sebelum migrasi di-run)
+    // Merge dengan kanvas lokal yang relevan untuk user saat ini
     const localList = getLocalCanvases();
     const localFiltered = localList.filter((c) => {
       if (isSuperAdmin) return true;
       if (isSigap) return !c.owner_id || c.owner_id === currentUserId;
       if (currentUserId && c.owner_id === currentUserId) return true;
-      return !c.owner_id;
+      if (sharesMap.has(c.id)) return true;
+      return false; // JANGAN tampilkan kanvas orang lain!
     });
 
     const dbIds = new Set(dbCanvases.map((c) => c.id));
     const merged = [...dbCanvases];
     for (const loc of localFiltered) {
       if (!dbIds.has(loc.id)) {
+        let perm: "owner" | "edit" | "view" = "view";
+        if (isSuperAdmin || (currentUserId && loc.owner_id === currentUserId) || (isSigap && !loc.owner_id)) {
+          perm = "owner";
+        } else if (sharesMap.has(loc.id)) {
+          perm = sharesMap.get(loc.id)!;
+        }
         merged.push({
           ...loc,
-          user_permission: "owner",
+          user_permission: perm,
         });
       }
     }
 
+    // Return hasil kanvas user saat ini
     if (merged.length > 0) {
       return merged;
     }
+
+    // Jika user adalah Sigap atau Super Admin dan belum memiliki kanvas apapun, berikan kanvas default awal
+    if (isSigap || isSuperAdmin) {
+      return [
+        {
+          id: "default-canvas",
+          title: "Pohon Silsilah Keluarga",
+          description: "Pohon silsilah keluarga dan seluruh garis keturunan.",
+          root_person_id: null,
+          included_person_ids: null,
+          is_default: true,
+          owner_id: currentUserId || null,
+          is_public: true,
+          user_permission: "owner",
+          settings: { displayMode: "branch" },
+          custom_positions: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: currentUserId || null,
+        },
+      ];
+    }
+
+    // Untuk user baru (seperti Ahlan) yang belum membuat kanvas dan belum menerima share, return KOSONG []
+    return [];
   } catch (err) {
-    console.warn("Supabase canvases query failed:", err);
+    console.warn("Supabase canvases query notice:", err);
   }
 
-  // Fallback ke local storage
-  const localList = getLocalCanvases();
-  if (localList.length > 0) return localList;
+  // Jika user adalah Sigap atau Super Admin, berikan fallback kanvas keluarga
+  if (isSigap || isSuperAdmin) {
+    const localList = getLocalCanvases();
+    if (localList.length > 0) return localList;
+    return [
+      {
+        id: "default-canvas",
+        title: "Pohon Silsilah Keluarga",
+        description: "Pohon silsilah keluarga dan seluruh garis keturunan.",
+        root_person_id: null,
+        included_person_ids: null,
+        is_default: true,
+        owner_id: null,
+        is_public: true,
+        user_permission: "owner",
+        settings: { displayMode: "branch" },
+        custom_positions: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: null,
+      },
+    ];
+  }
 
-  // Fallback default kanvas keluarga awal
-  return [
-    {
-      id: "default-canvas",
-      title: "Pohon Silsilah Keluarga",
-      description: "Pohon silsilah keluarga dan seluruh garis keturunan.",
-      root_person_id: null,
-      included_person_ids: null,
-      is_default: true,
-      owner_id: null,
-      is_public: true,
-      user_permission: "owner",
-      settings: { displayMode: "branch" },
-      custom_positions: {},
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      created_by: null,
-    },
-  ];
+  return [];
 }
 
 /** Ambil satu kanvas berdasarkan ID */
